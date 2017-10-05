@@ -11,17 +11,19 @@ else
 	CFLAGS += -O3
 endif
 
-CFLAGS += -Wall -I/usr/local/STAR-Dundee/STAR-System/inc/star/
+CFLAGS += -Wall 
+LIBS_PATH = -I/usr/local/STAR-Dundee/STAR-System/inc/star/
+LIBS = -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api
 
 OBJS = $(addsuffix .o, $(basename $(SRC)))
 
 all:  $(TARGET)
 
 .c.o:
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(LIBS_PATH) -c $< -o $@
 
 $(TARGET) : $(OBJS)
-	$(CC) $(CFLAGS) $^ -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api $(LINK_FLAGS) -o $@
+	$(CC) $(CFLAGS) $(LIBS_PATH) $^ $(LIBS) $(LINK_FLAGS) -o $@
 
 clean:
 	$(RM) $(OBJS) $(TARGET)
