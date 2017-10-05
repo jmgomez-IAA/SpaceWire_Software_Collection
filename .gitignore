@@ -220,6 +220,7 @@ dkms.conf
 GPATH
 GRTAGS
 GTAGS
+TAGS
 
 #Backup and Temporal Files
 *~

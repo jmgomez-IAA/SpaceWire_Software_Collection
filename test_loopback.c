@@ -1,3 +1,22 @@
+/*
+  @file test_loopback.c
+  @author Juan Manuel Gómez
+  @brief Loopback test for Spw Network with GR718 
+         and Star-Dundee MK3 Brick.
+  @details Demostrates the comunication over an SpaceWire Network, 
+           which includes two Node and a Router. The STAR-DUNDEE
+	   Link 1 transmit the packet and the Link 2 receive it.
+	   The packet include an address path, in order to allow 
+	   the GR718 routes the packet to the reception link.
+  @remark If the Router is not included, the received packet will include
+          address path in the header, and will be detected as erroneous.
+  @todo Configurable input. The Packet size, the Address path should be
+        configurable.
+  @param No parammeters needed.
+  @example ./test_loopback  
+  @copyright jmgomez CSIC-IAA
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "utility.h"
@@ -48,43 +67,42 @@ void printPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket){
     STAR_destroyPacketData(pTxStreamData);
 }
 
+
 unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp)
 {
-    unsigned long errorCount = 0U, i;
-    unsigned int rxPacketCount;
-    STAR_STREAM_ITEM *pRxStreamItem;
-    char *pRxBuffer;
-    U32 rxPacketLength;
+  unsigned long i;
+  unsigned int rxPacketCount;
+  STAR_STREAM_ITEM *pRxStreamItem;
 
-    /* Get the number of traffic items received */
-    rxPacketCount = STAR_getTransferItemCount(pTransferOp);
-    if (rxPacketCount == 0)
+  /* Get the number of traffic items received */
+  rxPacketCount = STAR_getTransferItemCount(pTransferOp);
+  if (rxPacketCount == 0)
     {
-        printf("No packets received.\n");
+      printf("No packets received.\n");
     }
-    else
+  else
     {
-        /* For each traffic item received */
-        for (i = 0U; i < rxPacketCount; i++)
+      /* For each traffic item received */
+      for (i = 0U; i < rxPacketCount; i++)
         {
-            /* Get the packet */
-            pRxStreamItem = STAR_getTransferItem(pTransferOp, i);
-            if ((pRxStreamItem == NULL) || (pRxStreamItem->itemType !=
-                    STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) ||
-                (pRxStreamItem->item == NULL))
+	  /* Get the packet */
+	  pRxStreamItem = STAR_getTransferItem(pTransferOp, i);
+	  if ((pRxStreamItem == NULL) || (pRxStreamItem->itemType !=
+					  STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) ||
+	      (pRxStreamItem->item == NULL))
             {
-                printf("\nERROR received an unexpected traffic type, or empty traffic item in item %lu\n",
-                    i);
+	      printf("\nERROR received an unexpected traffic type, or empty traffic item in item %lu\n",
+		     i);
             }
-            else
+	  else
             {
-		printPacket( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
+	      printPacket( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
             }
         }
     }
 
-    /* Return the error count */
-    return rxPacketCount;
+  /* Return the error count */
+  return rxPacketCount;
 }
 
 
@@ -154,249 +172,274 @@ unsigned long comparePackets(STAR_TRANSFER_OPERATION * const pTransferOp,
 
 
 
+#define _TX_INTERFACE 1
+#define _RX_INTERFACE 2
+#define _PACKET_SIZE 64
+
+#define _TX_BAUDRATE_MUL 2
+#define _TX_BAUDRATE_DIV 4
+#define _RX_BAUDRATE_MUL 2
+#define _RX_BAUDRATE_DIV 4
+
+#define _ADDRESS_PATH 2
+#define _ADDRESS_PATH_SIZE 1
+
+
+/******************************************************************/
+/*                                                                */
+/*****************************************************************/
 int __cdecl main(int argc, char *argv[]){
 
-    STAR_DEVICE_ID* devices;
-    STAR_DEVICE_ID deviceId;
-    U32 deviceCount = 0U, i;
-    unsigned int txChannelNumber, rxChannelNumber;
-    STAR_CHANNEL_MASK channelMask;
-    char *deviceName, s[256];
-	 STAR_CFG_MK2_HARDWARE_INFO hardwareInfo;
-    char versionStr[STAR_CFG_MK2_VERSION_STR_MAX_LEN];
-    char buildDateStr[STAR_CFG_MK2_BUILD_DATE_STR_MAX_LEN];
+  STAR_DEVICE_ID* devices;
+  STAR_DEVICE_ID deviceId;
+  U32 deviceCount = 0U, i;
 
+  STAR_CHANNEL_MASK channelMask;
+  STAR_CFG_MK2_HARDWARE_INFO hardwareInfo;
+  char versionStr[STAR_CFG_MK2_VERSION_STR_MAX_LEN];
+  char buildDateStr[STAR_CFG_MK2_BUILD_DATE_STR_MAX_LEN];
 
-    /* Get the list of devices of the specified type */
-    devices = STAR_getDeviceListForType(STAR_DEVICE_TXRX_SUPPORTED , &deviceCount);
-    if (devices == NULL){
-	puts("No device found\n");	
-	return 0;
-    } 
-
-    deviceId = devices[0];	
-
-    if (deviceId == STAR_DEVICE_UNKNOWN){
-	puts("Error dispositivo desconocido.\n");
-        return 0;
-    }
-
-
-    /* Get hardware info*/
-    CFG_MK2_getHardwareInfo(deviceId, &hardwareInfo);
-    CFG_MK2_hardwareInfoToString(hardwareInfo, versionStr, buildDateStr);
-    /* Display the hardware info*/
-    printf("\nVersion: %s", versionStr);
-    printf("\nBuildDate: %s", buildDateStr);	
+  unsigned int txChannelNumber, rxChannelNumber;
+  STAR_CHANNEL_ID rxChannelId = 0U, txChannelId = 0U;
+  STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams;
 
 
 
-    // Flashes the LEDS.
-    if (CFG_MK2_identify(deviceId) == 0)
+
+  /***************************************************************/
+  /*        Configuration                                        */
+  /*                                                             */
+  /* Channel 1 = Transmit interface                              */
+  /* Channel 2 = Receive  interface                              */
+  /* BaudRate  = 100 Mbps (100*2/4)*2                            */
+  /* Packet Size = 1 KB                                          */
+  /***************************************************************/
+
+  txChannelNumber = _TX_INTERFACE;
+  rxChannelNumber = _RX_INTERFACE;
+  clockRateParams.multiplier = _TX_BAUDRATE_MUL;
+  clockRateParams.divisor = _TX_BAUDRATE_DIV;
+  
+
+  /* Get the list of devices of the specified type */
+  devices = STAR_getDeviceListForType(STAR_DEVICE_TXRX_SUPPORTED , &deviceCount);
+  if (devices == NULL){
+    puts("No device found\n");	
+    return 0;
+  } 
+
+  /* We are working with the first device, what if I have more? */
+  deviceId = devices[0];	
+  if (deviceId == STAR_DEVICE_UNKNOWN){
+    puts("Error dispositivo desconocido.\n");
+    return 0;
+  }
+
+  /* Get hardware info*/
+  CFG_MK2_getHardwareInfo(deviceId, &hardwareInfo);
+  CFG_MK2_hardwareInfoToString(hardwareInfo, versionStr, buildDateStr);
+  /* Display the hardware info*/
+  printf("\nVersion: %s", versionStr);
+  printf("\nBuildDate: %s", buildDateStr);	
+  // Flashes the LEDS.
+  if (CFG_MK2_identify(deviceId) == 0)
     {
-        puts("\nERROR: Unable to identify device");
+      puts("\nERROR: Unable to identify device");
+      return 0U;
     }
 
-	//Configure Channel 1 for TX
-    /* Get the channels present on the device */
-    channelMask = STAR_getDeviceChannels(deviceId);
-    if (channelMask != 7U)
+  /* Get the channels present on the device  */
+  /* We need at least 2 Channels (0x00000007) */
+  channelMask = STAR_getDeviceChannels(deviceId);
+  if (channelMask != 7U)
     {
-        puts("La mascara de canales indica que no hay suficientes canales.\n");
-        return 0U;
+      puts("The device does not have channel 1 and 2 available.\n");
+      return 0U;
     }
 
+  int status_link = 0;
+  status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, txChannelNumber, clockRateParams);	
+  if (status_link == 0){
+    puts("Error setting the Tx link speed.\n");	
+  }
 
-    txChannelNumber = 1;
-    rxChannelNumber = 2;
-    STAR_CHANNEL_ID rxChannelId = 0U, txChannelId = 0U;
+  status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, rxChannelNumber, clockRateParams );
+  if (status_link == 0){
+    puts("Error setting the RX link speed.\n");	
+  }
 
-    STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams;
+  /* Open channel 1 for Transmit*/
+  txChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_OUT,
+					      txChannelNumber, TRUE);
+  if (txChannelNumber == 0U)
+    {
+      puts("\nERROR: Unable to open TX channel 1\n");
+      return 0;
+    }
+  /* Open channel 2 for Receipt*/
+  rxChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_IN,
+					      rxChannelNumber, TRUE);
+  if (rxChannelId == 0U)
+    {
+      puts("\nERROR: Unable to open RX channel 2\n");
+      return 0;
+    }
 
-  /* Set port 2 to have a base transmit rate of 150Mbps
-        ie (100*3/4)*2    */
-    clockRateParams.multiplier = 2;
-    clockRateParams.divisor = 4;
-
-	int status_link = 0;
-//	status_link = CFG_MK2_setBaseTransmitClock(deviceId, txChannelNumber, clockRateParams);
-//	status_link = CFG_BRICK_MK3_setTransmitClock(deviceId, txChannelNumber, clockRateParams );
-	status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, txChannelNumber, clockRateParams );
+  puts("Channels Opened.\n");	
 	
-	if (status_link == 0){
-		puts("Error setting the Tx link speed.\n");	
-	}
+  /*****************************************************************/
+  /*    Allocate memory for the transmit buffer and construct      */
+  /*    the packet to transmit.                                    */
+  /*****************************************************************/
+  unsigned long byteSize = 0;
+  char *pTxBuffer = NULL;
+  STAR_TRANSFER_OPERATION *pTxTransferOp = NULL, *pRxTransferOp = NULL;
+  STAR_STREAM_ITEM *pTxStreamItem = NULL;
+  unsigned char newPath[128];
+  unsigned int pathLen = 0;
+  STAR_SPACEWIRE_ADDRESS *pAddressPath = NULL;
 
-	status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, rxChannelNumber, clockRateParams );
-	if (status_link == 0){
-		puts("Error setting the RX link speed.\n");	
-	}
+  byteSize = _PACKET_SIZE;
+  pathLen = _ADDRESS_PATH_SIZE;
+  newPath[0] = _ADDRESS_PATH;
+  newPath[1] = 2;
 
-   /* Open channel 1 for Transmit*/
-    txChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_OUT,
-        txChannelNumber, TRUE);
-    if (txChannelNumber == 0U)
+  /* Allocate memory for the transmit buffer */
+  pTxBuffer = (char *)calloc(1U, byteSize);
+  if (pTxBuffer == NULL)
     {
-        puts("\nERROR: Unable to open TX channel 1\n");
-        return 0;
+      puts("\nERROR: Unable to allocate memory for transmit buffer");
+      return 0;
     }
-	
-    rxChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_IN,
-        rxChannelNumber, TRUE);
-    if (rxChannelId == 0U)
+  /*Initialize with data*/
+  for(i=0; i< byteSize; ++i){
+    pTxBuffer[i] = i;
+  }
+
+  /* Create a SpaceWire address from the path */
+  pAddressPath = STAR_createAddress(newPath, pathLen);
+
+  /* Create the transfer operations. */
+  pRxTransferOp = STAR_createRxOperation(1, STAR_RECEIVE_PACKETS);
+  if (pRxTransferOp == NULL)
     {
-        puts("\nERROR: Unable to open RX channel 2\n");
-        return 0;
+      puts("\nERROR: Unable to create receive operation");
+      return 0;
     }
 
-
-	puts("Channels Opened.\n");	
-	
-    unsigned long byteSize = 2048;
-    char *pTxBuffer = NULL;
-    STAR_TRANSFER_OPERATION *pTxTransferOp = NULL, *pRxTransferOp = NULL;
-    STAR_STREAM_ITEM *pTxStreamItem = NULL;
-
-/* Allocate memory for the transmit buffer */
-    pTxBuffer = (char *)calloc(1U, byteSize);
-    if (pTxBuffer == NULL)
+  /* Create the packet to be transmitted */
+  pTxStreamItem = STAR_createPacket(pAddressPath, (U8 *)pTxBuffer, byteSize,
+				    STAR_EOP_TYPE_EOP);
+  if (pTxStreamItem == NULL)
     {
-        puts("\nERROR: Unable to allocate memory for transmit buffer");
-        return 0;
+      puts("\nERROR: Unable to create the packet to be transmitted");
+      return 0;
     }
 
-    for(i=0; i< byteSize; ++i){
-	pTxBuffer[i] = i;
-    }
+  /* Print the Packet. Diabled for Packets bigger thant 64B */
+  printPacket((STAR_SPACEWIRE_PACKET *)pTxStreamItem->item);
 
-/* Create a SpaceWire address from the path */
-
-    unsigned char newPath[128];
-    unsigned int pathLen = 0;
-    STAR_SPACEWIRE_ADDRESS *pAddressPath = NULL;
-
-    newPath[0] = 2;
-    newPath[1] = 2;
-    pathLen = 1;
-    pAddressPath = STAR_createAddress(newPath, pathLen);
-
-// Create the transfer operations.
-
- pRxTransferOp = STAR_createRxOperation(1, STAR_RECEIVE_PACKETS);
-    if (pRxTransferOp == NULL)
+  /* Create the transmit transfer operation for the packet */
+  pTxTransferOp = STAR_createTxOperation(&pTxStreamItem, 1U);
+  if (pTxTransferOp == NULL)
     {
-        puts("\nERROR: Unable to create receive operation");
-	return 0;
+      puts("\nERROR: Unable to create the transfer operation to be transmitted");
+      return 0;
     }
 
-    /* Create the packet to be transmitted */
-    pTxStreamItem = STAR_createPacket(pAddressPath, (U8 *)pTxBuffer, byteSize,
-        STAR_EOP_TYPE_EOP);
-    if (pTxStreamItem == NULL)
+  /***************************************************************/
+  /*    Submit the operations                                    */
+  /*                                                             */
+  /***************************************************************/
+
+  /* Submit the receive operation */
+  if (STAR_submitTransferOperation(rxChannelId, pRxTransferOp) == 0)
     {
-        puts("\nERROR: Unable to create the packet to be transmitted");
-	return 0;
+      printf("\nERROR occurred during receive.  Test Tfailed.\n");
+      return 0;
     }
 
-
-    printPacket((STAR_SPACEWIRE_PACKET *)pTxStreamItem->item);
-
-    /* Create the transmit transfer operation for the packet */
-    pTxTransferOp = STAR_createTxOperation(&pTxStreamItem, 1U);
-    if (pTxTransferOp == NULL)
+  /* Submit the transmit operation */
+  if (STAR_submitTransferOperation(txChannelId, pTxTransferOp) == 0)
     {
-        puts("\nERROR: Unable to create the transfer operation to be transmitted");
-	return 0;
+      printf("\nERROR occurred during transmit.  Test failed.\n");
+      return 0;
     }
 
-//Submit the operations
-unsigned long  testNum = 0;
-      /* Submit the receive operation */
-        if (STAR_submitTransferOperation(rxChannelId, pRxTransferOp) == 0)
-        {
-            printf("\nERROR occurred during receive.  Test %lu failed.\n",
-                testNum + 1U);
-		return 0;
-        }
+  //Wait the operations to finish.
+  STAR_TRANSFER_STATUS rxStatus, txStatus;
 
-        /* Submit the transmit operation */
-        if (STAR_submitTransferOperation(txChannelId, pTxTransferOp) == 0)
-        {
-            printf("\nERROR occurred during transmit.  Test %lu failed.\n",
-                testNum + 1U);
-		return 0;
-        }
-
-//Wait the operations to finish.
-STAR_TRANSFER_STATUS rxStatus, txStatus;
-
-        /* Wait on the transmit operation completing */
-        txStatus = STAR_waitOnTransferOperationCompletion(pTxTransferOp,
-            STAR_INFINITE);
-        if(txStatus != STAR_TRANSFER_STATUS_COMPLETE)
-        {
-            printf("\nERROR occurred during transmit.  Test %lu failed.\n",
-                testNum + 1U);
-		return 0;
-        }
-
-        /* Wait on the receive operation completing */
-        rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
-            STAR_INFINITE);
-        if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
-        {
-            printf("\nERROR occurred during receive.  Test %lu failed.\n",
-                testNum + 1U);
-		return 0;
-        }
-
-
-//Compare the results
-	int errorCount;
-       errorCount += comparePackets(pRxTransferOp, 1U, byteSize, pTxBuffer);
-
-	printf("El numero de errores es: %i.\n", errorCount);
-
-
-    printRxPackets((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
-
-    /* Dispose of the transfer operations */
-    if (pTxTransferOp != NULL)
+  /* Wait on the transmit operation completing */
+  txStatus = STAR_waitOnTransferOperationCompletion(pTxTransferOp,
+						    STAR_INFINITE);
+  if(txStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
-        STAR_disposeTransferOperation(pTxTransferOp);
-    }
-    if (pRxTransferOp != NULL)
-    {
-        STAR_disposeTransferOperation(pRxTransferOp);
+      printf("\nERROR occurred during transmit.  Test failed.\n");
+      return 0;
     }
 
-    /* Destroy the packet transmitted */
-    if (pTxStreamItem != NULL)
+  /* Wait on the receive operation completing */
+  rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
+						    STAR_INFINITE);
+  if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
-        STAR_destroyStreamItem(pTxStreamItem);
+      printf("\nERROR occurred during receive.  Test failed.\n");
+      return 0;
     }
 
-    /* Free the transmit buffer */
-    if (pTxBuffer != NULL)
+  /****************************************************************/
+  /*    Check the Results                                         */
+  /*                                                              */
+  /****************************************************************/
+
+  //Compare the results
+  int errorCount = 0;
+  errorCount += comparePackets(pRxTransferOp, 1U, byteSize, pTxBuffer);
+  printf(" Error found in the communication: %i.\n", errorCount);
+
+  printRxPackets((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
+
+  /* Dispose of the transfer operations */
+  if (pTxTransferOp != NULL)
     {
-        free(pTxBuffer);
+      STAR_disposeTransferOperation(pTxTransferOp);
     }
 
-    /* Free the address path */
-    if (pAddressPath != NULL)
+  if (pRxTransferOp != NULL)
     {
-        STAR_destroyAddress(pAddressPath);
+      STAR_disposeTransferOperation(pRxTransferOp);
     }
 
-    /* Close the channels */
-    if (rxChannelId != 0U)
+  /* Destroy the packet transmitted */
+  if (pTxStreamItem != NULL)
     {
-        STAR_closeChannel(rxChannelId);
+      STAR_destroyStreamItem(pTxStreamItem);
     }
-    if (txChannelId != 0U)
+
+  /* Free the transmit buffer */
+  if (pTxBuffer != NULL)
     {
-        STAR_closeChannel(txChannelId);
+      free(pTxBuffer);
     }
+
+  /* Free the address path */
+  if (pAddressPath != NULL)
+    {
+      STAR_destroyAddress(pAddressPath);
+    }
+
+  /* Close the channels */
+  if (rxChannelId != 0U)
+    {
+      STAR_closeChannel(rxChannelId);
+    }
+
+  if (txChannelId != 0U)
+    {
+      STAR_closeChannel(txChannelId);
+    }
+
+  return 0;
 }
 
 
