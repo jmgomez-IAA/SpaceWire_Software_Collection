@@ -266,7 +266,7 @@ int __cdecl main(int argc, char *argv[]){
   /* Fill the memory with the packet */
   
   status = RMAP_FillWriteCommandPacket(pTarget, 2, pReply, 1, 1, 0, 0, 0x00,
-				       0, 0x808, 0, pData, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
+				       0, 0x820, 0, pData, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 				       fillPacketLenCalculated);
   if (!status)
     {

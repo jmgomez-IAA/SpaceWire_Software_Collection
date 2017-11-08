@@ -1,4 +1,4 @@
-AC_INIT([SpW_Loopback_Test], [1.0], [jmgomez@iaa.es])
+AC_INIT([SpW Software Collection], [1.0], [jmgomez@iaa.es])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 
 dnl LIBSTAR_PATH=/usr/local/STAR-Dundee/STAR-System/inc/star/

@@ -1,5 +1,5 @@
 /*
-  @file test_rmap.c
+  @file test_read_rmap.c
   @author Juan Manuel Gómez
   @brief Demostration RMAP packet to configure GR718 
   @details Demostrates how to configure GR718B using RMAP packets. The   
@@ -250,7 +250,7 @@ int __cdecl main(int argc, char *argv[]){
         fillPacketLenCalculated);
    */
   status = RMAP_FillReadCommandPacket(pTarget, 2, pReply, 1, 0, 0x00,
-				      0, 0x808, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
+				      0, 0x198, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 				       fillPacketLenCalculated);
   if (!status)
     {

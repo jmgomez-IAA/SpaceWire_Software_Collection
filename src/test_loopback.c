@@ -181,7 +181,7 @@ unsigned long comparePackets(STAR_TRANSFER_OPERATION * const pTransferOp,
 #define _RX_BAUDRATE_MUL 2
 #define _RX_BAUDRATE_DIV 4
 
-#define _ADDRESS_PATH 2
+#define _ADDRESS_PATH 8
 #define _ADDRESS_PATH_SIZE 1
 
 
