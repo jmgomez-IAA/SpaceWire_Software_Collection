@@ -1,12 +1,12 @@
 /*
-  @file test_la_routing.c
+  @file apus.c
   @author Juan Manuel Gómez
   @brief Spacewire Test Logical Routing Plato GR718B
   @details Configures the routing table to implement a logical routing.
   Enable the Spw Interfaces and configure the baudrate to run clk_div = 0.
   Configure the Routing table to 
   @param No parammeters needed.
-  @example ./la_rout
+  @example ./apus
   @copyright jmgomez CSIC-IAA
 */
 
@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "system_config.h"
 #include "utility.h"
 #include "star-dundee_types.h"
@@ -46,10 +47,167 @@ uint32_t processPacket( STAR_SPACEWIRE_PACKET * streamItemPacket);
 uint32_t processRegister(STAR_SPACEWIRE_PACKET * streamItemPacket);
 
 
+
+//  pthread_attr_init(tinfo);
+struct thread_info{
+  pthread_t threadId;
+  STAR_CHANNEL_ID channelId;
+  char threadName[32];
+
+  struct STAR_STREAM_ITEM **item;
+  //For efficiency, it allows to access directly to the end.
+  struct STAR_STREAM_ITEM *last;
+
+};
+
+void *tx_thread(void *arg)
+{
+  struct thread_info *params;
+  STAR_TRANSFER_OPERATION *pTxTransferOp = NULL;
+  uint32_t number_of_items;
+  
+  number_of_items = 1;
+
+  params = (struct thread_info *) arg;
+
+
+  /* Create the transmit transfer operation for the packet */
+  pTxTransferOp = STAR_createTxOperation(params->item, number_of_items);
+  if (pTxTransferOp == NULL)
+    {
+      puts("\nERROR: Unable to create the transfer operation to be transmitted");
+      pthread_exit( 0);
+    }
+  else{
+    printf("Tx operation created. \n");
+  }
+
+  //Dispose the stream item.
+  if (params->item != NULL){
+    free((*params->item));
+  }
+   
+   
+  /***************************************************************/
+  /*    Submit the TX operations                                    */
+  /*                                                             */
+  /***************************************************************/
+  /* Submit the transmit operation */
+  if (STAR_submitTransferOperation(params->channelId, pTxTransferOp) == 0) {
+    printf("\nERROR occurred during submit.  Test failed.\n");
+    //	return 0;
+  }
+
+  //Wait the operations to finish.
+  STAR_TRANSFER_STATUS  txStatus;
+  txStatus = STAR_TRANSFER_STATUS_NOT_STARTED;
+  while(txStatus != STAR_TRANSFER_STATUS_COMPLETE )
+    {
+
+      /* Wait on the transmit operation completing */
+      txStatus = STAR_waitOnTransferOperationCompletion(pTxTransferOp,
+							STAR_INFINITE);
+
+      if(txStatus != STAR_TRANSFER_STATUS_COMPLETE) 
+ 	{
+	  printf("\nERROR Operation Time-Out.\n Retrying.\n"); 	  
+	}
+    }
+
+  /* Dispose of the transfer operations */
+  if (pTxTransferOp != NULL) 
+    {
+      STAR_disposeTransferOperation(pTxTransferOp);
+    }
+ 
+  //  pthread_exit(0);
+  printf ("End of Thread TX.\n");
+  return 0;
+}
+
+void *rx_thread(void *arg)
+{
+  struct thread_info params;
+  STAR_STREAM_ITEM * pRxStreamItem;
+  STAR_TRANSFER_OPERATION *pRxTransferOp = NULL;
+  const uint32_t number_of_items = 1;
+  uint32_t packetReceived = 0, i;
+  STAR_TRANSFER_STATUS rxStatus;
+
+  //It should be safer to reserve space for the params and do a copy. This avoid 
+  //memory corruption in case the thread creator, frees the memory of the parammeters.
+  params.channelId = ((struct thread_info *) arg)->channelId;
+
+  // Create an RX operation to receive the Packet on port 2.
+  pRxTransferOp = STAR_createRxOperation(number_of_items , STAR_RECEIVE_PACKETS);
+  if (pRxTransferOp == NULL)
+    {
+      printf("[RXThread] : Error, unable to create receive operation.\n");
+      pthread_exit(0);
+    }
+
+  /* Submit the receive operation */
+  if (STAR_submitTransferOperation( params.channelId, pRxTransferOp) == 0)
+    {
+      printf("\nERROR occurred during receive.  Test failed.\n");
+      pthread_exit(0);
+    }
+
+  printf ("RX opReady.\n");
+
+  /* Wait on the receive operation completing */
+
+  while(!packetReceived)
+    {
+      rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
+							STAR_INFINITE);
+      if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
+	{
+	  printf("\nERROR occurred during receive.  Test failed.\n");
+	  return 0;
+	}
+      else
+	{
+	  printf("Packet Received.\n");
+	  packetReceived = 1;	  
+	}
+    }
+
+  //  processRxOperation( pRxTransferOp);
+  packetReceived = STAR_getTransferItemCount(pRxTransferOp);
+  if (packetReceived != 0 )
+    {
+      for(i=0; i< packetReceived; ++i)
+	{
+	  //Get element index i on the STREAM ITEM.
+	  pRxStreamItem = STAR_getTransferItem (pRxTransferOp, i);
+	  if (pRxStreamItem != NULL && pRxStreamItem->item != NULL &&
+	      pRxStreamItem->itemType == STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET)
+	    {
+	      processPacket( pRxStreamItem->item);
+	    }
+	}
+    }
+
+  if (pRxTransferOp != NULL)
+    STAR_disposeTransferOperation(pRxTransferOp);
+
+  //  pthread_exit(0);
+  printf("End of thread RX.\n");
+  
+  return 0;
+}
+
+
+
 int __cdecl  main(int argc, char * argv[]){
   STAR_DEVICE_ID* devices;
   STAR_DEVICE_ID deviceId;
   unsigned int deviceCount;
+
+  const uint32_t threads_nr = 0;
+  const uint32_t max_threads_nr = 16;
+  pthread_t threads[max_threads_nr];
 
 
   if (argc < 2)
@@ -113,7 +271,7 @@ int __cdecl  main(int argc, char * argv[]){
   /* Packet Size = 1 KB                                          */
   /***************************************************************/
   STAR_CHANNEL_ID testPortChannel, testPortChannel2;
-  STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams;
+  STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams; 
 
   int status_link = 0;
   clockRateParams.multiplier = _TX_BAUDRATE_MUL;
@@ -140,7 +298,8 @@ int __cdecl  main(int argc, char * argv[]){
   if(testPortChannel2 == 0){
     puts("\nError : Unable to open the Channel.");
   } 
- 
+
+
   puts("\nChannel Spw 1 Opened and ready to communicate.  ");
   puts("\nChannel Spw 2 Opened and ready to communicate.  ");
   puts("\n************************************************\n");
@@ -157,7 +316,7 @@ int __cdecl  main(int argc, char * argv[]){
   /*****************************************************************/
   /*       Create the Transmit and Receive Operations              */
   STAR_TRANSFER_OPERATION **pConfigRouterTransferOp = NULL;
-  STAR_TRANSFER_OPERATION *pTxTransferOp = NULL, *pRxTransferOp = NULL;
+
   STAR_STREAM_ITEM **vTxStreamItem = NULL;
   unsigned int rxOp_itemCount= 0, txOp_itemCount = 0, txRTPOP_Itemcount= 0;
   U8 pData[4];
@@ -178,89 +337,43 @@ int __cdecl  main(int argc, char * argv[]){
     return 0;
   }
 
-  /* Create the transmit transfer operation for the packet */
-  pTxTransferOp = STAR_createTxOperation(vTxStreamItem, number_of_items);
-  if (pTxTransferOp == NULL)
-    {
-      puts("\nERROR: Unable to create the transfer operation to be transmitted");
-      return 0;
-    }
-  else{
-    printf("Tx operation created. \n");
-  }
+  struct thread_info tx_params, tinfo;
+  pthread_attr_t attr;
+  uint32_t thread_status;
 
-  //Dispose the stream items.
-  uint32_t it = 0;
-  if (vTxStreamItem != NULL){
-    for (it = 0; it < number_of_items; ++it)
-      {
-	free(vTxStreamItem[it]);
-      }
-    free(vTxStreamItem);
-  }
+  //main should wait for threads before free resources, closing channel.
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+  //Lets create a Treat to manage the RX operations of the TestPortchannel.
+  tinfo.channelId = testPortChannel;
+  strcpy(tinfo.threadName, "RxThread");
   
+  tx_params.channelId = testPortChannel2;
+  tx_params.item = vTxStreamItem;
+  strcpy (tx_params.threadName, "TxThread");
 
-  // Create an RX operation to receive the Packet on port 2.
-  
-  /* Create the transfer operations. */
-  pRxTransferOp = STAR_createRxOperation(number_of_items , STAR_RECEIVE_PACKETS);
-  if (pRxTransferOp == NULL)
-    {
-      puts("\nERROR: Unable to create receive operation");
-      return 0;
-    }
-
-  /***************************************************************/
-  /*    Submit the operations                                    */
-  /*                                                             */
-  /***************************************************************/
-
-  /* Submit the transmit operation */
-  if (STAR_submitTransferOperation(testPortChannel, pTxTransferOp) == 0) {
-    printf("\nERROR occurred during transmit.  Test failed.\n");
+  thread_status = pthread_create(& (tinfo.threadId), &attr, 
+				  rx_thread, (void *) & tinfo);
+  if (thread_status){
+    printf("Error createing the RX thread.\n");
     return 0;
   }
 
-  //Wait the operations to finish.
-  STAR_TRANSFER_STATUS rxStatus, txStatus;
-
-  /* Wait on the transmit operation completing */
-  txStatus = STAR_waitOnTransferOperationCompletion(pTxTransferOp,
-						    STAR_INFINITE);
-  if(txStatus != STAR_TRANSFER_STATUS_COMPLETE) 
+  thread_status = pthread_create(& tx_params.threadId, &attr, 
+				 tx_thread,(void *) &tx_params);
+  if (thread_status)
     {
-    printf("\nERROR occurred during transmit.  Test failed.\n");
-    return 0;
+      printf("Error creating TX thread.\n");
     }
 
-  /* Submit the receive operation */
-  if (STAR_submitTransferOperation(testPortChannel, pRxTransferOp) == 0)
-    {
-      printf("\nERROR occurred during receive.  Test Tfailed.\n");
-      return 0;
-    }
+  printf ("Threads create.\n");
 
-  printf ("RX opReady.\n");
+  void *st;
+  pthread_join(tx_params.threadId, NULL);
+  pthread_join(tinfo.threadId, NULL);
 
-
-  /* Wait on the receive operation completing */
-  rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
-						    STAR_INFINITE);
-  if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
-    {
-      printf("\nERROR occurred during receive.  Test failed.\n");
-      return 0;
-    }
-
-  processRxOperation((STAR_TRANSFER_OPERATION *) pRxTransferOp);
-
-  if (pRxTransferOp != NULL)
-    STAR_disposeTransferOperation(pRxTransferOp);
-
-  /* Dispose of the transfer operations */
-  if (pTxTransferOp != NULL) {
-    STAR_disposeTransferOperation(pTxTransferOp);
-  }
+  printf("End of threads.\n\n");
 
   /* Close the channels */
   if (testPortChannel != 0U) {
@@ -271,23 +384,10 @@ int __cdecl  main(int argc, char * argv[]){
     STAR_closeChannel(testPortChannel2);
   }
 
+  //    pthread_exit(NULL);
+    exit(0);
 
 }
-
-
-/* possible structure for Gr718Packet??
-typedef struct rmapPacket{
-  uint32_t * pTarget;
-  uint32_t trgtPathLength;
-  uint32_t * pReply;
-  uint32_t rplyPathLength;
-  uint32_t * pData;
-  uint32_t dataSize;
-  U8 srv;
-  
-};
-*/
-
 
 uint32_t processPacket( STAR_SPACEWIRE_PACKET * streamItemPacket){
   uint8_t *pStreamData = NULL;
@@ -300,13 +400,13 @@ uint32_t processPacket( STAR_SPACEWIRE_PACKET * streamItemPacket){
 
   
   pStreamItemAddress = STAR_getPacketAddress ( (STAR_SPACEWIRE_PACKET *) streamItemPacket);
-  if ( pStreamItemAddress != NULL){
+  /* if ( pStreamItemAddress != NULL){
     printf("Addres PATH: ");
-    for(i=0; i< pStreamItemAddress->pathLength; ++i)
-      printf( "\t0x%x", *(pStreamItemAddress->pPath + i) );
+    for(i=0; i<pStreamItemAddress->address->pathLen; ++i)
+      printf( "\t0x%x", (*pStreamItemAddress->address->pPath + i) );
     printf("\n");
   }
-
+*/
   //  if (
   for (i=0; i<streamDataSize; ++i)
     {
@@ -371,7 +471,7 @@ uint32_t processRxOperation(STAR_TRANSFER_OPERATION * const pTransferOp)
 		{
 		case STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET:
 		  printf("SpaceWire Packet Received.\n");
-		  processPacket((STAR_SPACEWIRE_PACKET *) pRxStreamItem->item);		  
+		  //processPacket((STAR_SPACEWIRE_PACKET *) pRxStreamItem->item);		  
 		  processRegister( pRxStreamItem->item);
 		  break;
 		case STAR_STREAM_ITEM_TYPE_TIMECODE:
@@ -401,7 +501,7 @@ uint32_t GR718_ReadRegister(STAR_STREAM_ITEM **pTxStreamItem, uint32_t reg_addr)
   unsigned long fillPacketLenCalculated, fillPacketLen;  
   
   U8 pTarget[] = {0,254};
-  U8 pReply[] = {0x21};
+  U8 pReply[] = {254};
   char status;  
   
   /* Calculate the length of a write command packet, with 4 bytes of data */
@@ -416,8 +516,8 @@ uint32_t GR718_ReadRegister(STAR_STREAM_ITEM **pTxStreamItem, uint32_t reg_addr)
       return 1;
     }
   
-  status = RMAP_FillReadCommandPacket(pTarget, 2, pReply, 1, 1, 0x00,
-				     0x13, reg_addr, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
+  status = RMAP_FillReadCommandPacket(pTarget, 2, pReply, 1, 0, 0x00,
+				      0, reg_addr, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 				       fillPacketLenCalculated);
   if (!status)
     {

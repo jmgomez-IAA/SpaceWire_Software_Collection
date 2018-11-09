@@ -45,6 +45,17 @@ unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp);
 void printPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket);
 uint32_t LoopBackPacketToStream (STAR_STREAM_ITEM **pTxStreamItem, uint8_t dst, uint8_t src, uint8_t *pValue, uint32_t reg_address);
 
+
+// Write Commands to configure the Router.
+//===========================================================
+char pRTR_PCTRL2_EN[] =  {0x00, 0x14, 0x02, 0x2E};
+char pRTR_RTMAP_ADDR254[] = {0x00, 0x00, 0x00, 0x04};
+char pRTR_RTMAP_PHY2[] = {0x00, 0x00, 0x00, 0x02};
+char pRTR_RTACTRL_ADDR254[] = {0x00, 0x00, 0x00, 0x0C};
+char pRTR_RTACTRL_PHY2[] = {0x00, 0x00, 0x00, 0x0C};
+
+
+
 int __cdecl  main(int argc, char * argv[]){
   STAR_DEVICE_ID* devices;
   STAR_DEVICE_ID deviceId;
@@ -142,12 +153,12 @@ int __cdecl  main(int argc, char * argv[]){
 
   unsigned long byteSize =  0;
   
-  U8 pData[] = {0x00, 0x14, 0x02, 0x2E};
+  U8 pData[16];
 
-  uint32_t rtr_config_cmd = 12;
+  uint32_t rtr_config_cmd = 6;
   uint32_t port_config_cmd = 10;
   txOp_itemCount = rtr_config_cmd + port_config_cmd;
-  rxOp_itemCount = 1; // txOp_itemCount;
+  rxOp_itemCount =  1; //txOp_itemCount;
   
   // Packet is pTarget 2 address and pReply 1. Use alignment.
   uint32_t opCounter= 0;
@@ -163,10 +174,12 @@ int __cdecl  main(int argc, char * argv[]){
   }
 
   uint32_t status;
+  strncpy (pData, pRTR_PCTRL2_EN, 4);  
+
   for(opCounter= 0; opCounter < port_config_cmd; ++ opCounter){
     reg_address = reg_base + reg_byteSize*opCounter;
     //    vTxStreamItem[opCounter] = NULL;
-    status = RTRCFG_WrRegToStream( vTxStreamItem+opCounter, pData, reg_address);
+    status = RTRCFG_WrRegToStream( vTxStreamItem+opCounter, pRTR_PCTRL2_EN, reg_address);
     if (status != 0){
       printf("Error generating the Stream.");
       return 0;
@@ -175,48 +188,25 @@ int __cdecl  main(int argc, char * argv[]){
   }
 
   //Prepare the Packets to configure the routing table.
-  //We should use the port_config_cmd offset to insert items to the stream
-  reg_base = 0x80;
-  uint32_t reg_base_ctrl = 0x480;
-  uint32_t dev_address = 0x0;
-  uint32_t offset = 0;
+  strncpy (pData, pRTR_RTMAP_ADDR254, 4);
+  status = RTRCFG_WrRegToStream ( vTxStreamItem+ port_config_cmd   , pRTR_RTMAP_ADDR254, 0x000003F8);
 
-  //  uint32_t val_data;
-  U8 val_data[] = {0x00, 0x00, 0x04, 0x00};
-  U8 val_data2[] = {0x00, 0x00, 0x00, 0x0C};
-  for(opCounter = 0 ; opCounter < (rtr_config_cmd-2); ++ opCounter){
+  strncpy (pData, pRTR_RTMAP_PHY2, 4);
+  status = RTRCFG_WrRegToStream ( vTxStreamItem+ port_config_cmd + 1, pRTR_RTMAP_PHY2, 0x00000008);
 
-    reg_address = reg_base + offset;
-    //    val_data = 1<<(opCounter+7);
-    //val_data = 0x10000000 | 1<<7;
-    status = RTRCFG_WrRegToStream( (vTxStreamItem + port_config_cmd)+opCounter, val_data, reg_address);
-    if (status != 0){
-      printf("Error generating the Stream.");
-      return 0;
-    }
-    printf("Included packet %d to the Stream.\n", opCounter + port_config_cmd );    
+  strncpy (pData, pRTR_RTACTRL_ADDR254, 4);
+  status = RTRCFG_WrRegToStream ( vTxStreamItem+ port_config_cmd + 2, pRTR_RTACTRL_ADDR254, 0x000007F8);
 
-    opCounter ++;
-    reg_address = reg_base_ctrl + offset;
-    //    val_data = 0x1000000D;
-    status = RTRCFG_WrRegToStream( (vTxStreamItem + port_config_cmd)+opCounter, val_data2, reg_address);
-    if (status != 0){
-      printf("Error generating the Stream.");
-      return 0;
-    }
-    printf("Included packet %d to the Stream.\n", opCounter + port_config_cmd );    
-
-    offset += 4;
-
-  }
+  strncpy (pData, pRTR_RTACTRL_PHY2, 4);  
+  status = RTRCFG_WrRegToStream ( vTxStreamItem+ port_config_cmd + 3, pRTR_RTACTRL_PHY2, 0x00000408);
 
 
-  
+  //Test packets.
 
   // val_data = opCounter;
-  status = LoopBackPacketToStream ( (vTxStreamItem + port_config_cmd)+opCounter , 0x20, 0xFE, val_data, reg_address);
+  status = LoopBackPacketToStream ( (vTxStreamItem + port_config_cmd)+ 4 , 0x20, 0xFE, pData, reg_address);
   //val_data = opCounter + port_config_cmd;
-  status = LoopBackPacketToStream ( (vTxStreamItem + port_config_cmd)+opCounter+1 , 0x21, 0xFE, val_data, reg_address);
+  status = LoopBackPacketToStream ( (vTxStreamItem + port_config_cmd)+ 5 , 0x21, 0xFE, pData, reg_address);
 
   printf("Stream Ready.\n");
 
@@ -330,7 +320,7 @@ uint32_t LoopBackPacketToStream (STAR_STREAM_ITEM **pTxStreamItem, uint8_t dst, 
 
 
   //Mandatory: We should include the address to Port 0 and the Target logical address 0xFE.
-  U8 pTarget[] = {0x20, 0xFE};
+  U8 pTarget[] = {0xFE};
 
   //  pTarget[1] = dst;
 
@@ -339,7 +329,7 @@ uint32_t LoopBackPacketToStream (STAR_STREAM_ITEM **pTxStreamItem, uint8_t dst, 
   //  pReply[1] = src;
 
   //Write operation of 4 bytes to update the value of a Register. 
-  fillPacketLenCalculated = RMAP_CalculateWriteCommandPacketLength(2, 1, 4,1);  
+  fillPacketLenCalculated = RMAP_CalculateWriteCommandPacketLength(1, 1, 4,1);  
 
   pFillPacket = malloc(fillPacketLenCalculated);
   if (!pFillPacket){
@@ -348,7 +338,7 @@ uint32_t LoopBackPacketToStream (STAR_STREAM_ITEM **pTxStreamItem, uint8_t dst, 
   }
 
   //FillWrPacket to reg_address
-  status_link = RMAP_FillWriteCommandPacket(pTarget, 2, pReply, 1, 1, 0, 0, 0x00,
+  status_link = RMAP_FillWriteCommandPacket(pTarget, 1, pReply, 1, 1, 0, 0, 0x00,
 					    0, reg_address, 0, pValue, 4, 
 					    &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 					    fillPacketLenCalculated);

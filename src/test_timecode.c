@@ -1,12 +1,10 @@
 /*
-  @file test_la_routing.c
+  @file test_time_code.c
   @author Juan Manuel Gómez
-  @brief Spacewire Test Logical Routing Plato GR718B
-  @details Configures the routing table to implement a logical routing.
-  Enable the Spw Interfaces and configure the baudrate to run clk_div = 0.
-  Configure the Routing table to 
+  @brief Spacewire Test time code difusion for Plato GR718B
+  @details 
   @param No parammeters needed.
-  @example ./la_rout
+  @example ./timecode
   @copyright jmgomez CSIC-IAA
 */
 
@@ -14,6 +12,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "system_config.h"
 #include "utility.h"
 #include "star-dundee_types.h"
@@ -46,30 +45,195 @@ uint32_t processPacket( STAR_SPACEWIRE_PACKET * streamItemPacket);
 uint32_t processRegister(STAR_SPACEWIRE_PACKET * streamItemPacket);
 
 
+
+//  pthread_attr_init(tinfo);
+struct thread_info{
+  pthread_t threadId;
+  STAR_CHANNEL_ID channelId;
+  char threadName[32];
+
+  struct STAR_STREAM_ITEM **item;
+  //For efficiency, it allows to access directly to the end.
+  struct STAR_STREAM_ITEM *last;
+
+};
+
+
+/**
+ *  @brief Transmit TimeCodes
+ */
+void *timecode_thread(void *arg)
+{
+  struct thread_info *params;
+  const uint32_t number_of_timecodes = 1;
+
+  uint8_t g_currentTimecode = 0;
+
+  params = (struct thread_info *) arg;
+
+  /* Create a time-code */
+  STAR_STREAM_ITEM *timecode = STAR_createTimeCode(g_currentTimecode);
+
+  if (timecode)
+  {
+
+    /* Create the transmit transfer operation for the packet */
+    STAR_TRANSFER_OPERATION *pTxTransferOp = STAR_createTxOperation(&timecode, number_of_timecodes);
+    if (pTxTransferOp == NULL)
+    {
+      puts("\nERROR: Unable to create the transfer operation to be transmitted");
+      pthread_exit( 0);
+    }
+    else{
+      printf("Tx operation created. \n");
+    }
+      
+    /***************************************************************/
+    /*    Submit the TX operations                                    */
+    /*                                                             */
+    /***************************************************************/
+    /* Submit the transmit operation */
+    if (STAR_submitTransferOperation(params->channelId, pTxTransferOp) == 0) {
+      printf("\nERROR occurred during submit.\nTest failed.\n");
+    //	return 0;
+    }
+
+    /* Wait on the transmit operation completing */
+    STAR_TRANSFER_STATUS  txStatus = STAR_waitOnTransferOperationCompletion(pTxTransferOp,
+                                                      STAR_INFINITE);
+
+    if(txStatus == STAR_TRANSFER_STATUS_COMPLETE) 
+    {
+      printf("Time-code %d transmitted successfully.\n", g_currentTimecode);
+    }
+    else
+    {
+      printf("\nTimecode Transmission error.\n");
+      
+    }
+
+    /* Dispose of transfer operation */
+    STAR_disposeTransferOperation(pTxTransferOp);
+    
+    /* Destroy time-code */
+    STAR_destroyStreamItem(timecode);    
+  }
+
+  //  pthread_exit(0);
+  printf ("End of Thread TX.\n");
+  return 0;
+}
+
+void *rx_thread(void *arg)
+{
+  struct thread_info params;
+  STAR_STREAM_ITEM * pRxStreamItem;
+  STAR_TRANSFER_OPERATION *pRxTransferOp = NULL;
+  const uint32_t number_of_items = 1;
+  uint32_t packetReceived = 0, i;
+  STAR_TRANSFER_STATUS rxStatus;
+
+  packetReceived = 0;
+  while(packetReceived < 20)
+  {
+    //It should be safer to reserve space for the params and do a copy. This avoid 
+    //memory corruption in case the thread creator, frees the memory of the parammeters.
+    params.channelId = ((struct thread_info *) arg)->channelId;
+
+    // Create an RX operation to receive the Packet on port 1.
+    pRxTransferOp = STAR_createRxOperation(number_of_items , STAR_RECEIVE_PACKETS);
+    if (pRxTransferOp == NULL)
+    {
+      printf("[RXThread] : Error, unable to create receive operation.\n");
+      pthread_exit(0);
+    }
+
+    /* Submit the receive operation */
+    if (STAR_submitTransferOperation( params.channelId, pRxTransferOp) == 0)
+    {
+      printf("\nERROR occurred during receive.  Test failed.\n");
+      pthread_exit(0);
+    }
+
+    //    printf ("RX opReady.\n");
+
+    /* Wait on the receive operation completing */
+
+    while(!packetReceived)
+    {
+      rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
+							STAR_INFINITE);
+      if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
+      {
+        printf("\nERROR occurred during receive.  Test failed.\n");
+        return 0;
+      }
+      else
+      {
+        packetReceived ++;	  
+        printf("Packet %d Received.\n", packetReceived);
+      }
+    }
+
+    //  processRxOperation( pRxTransferOp);
+    packetReceived = STAR_getTransferItemCount(pRxTransferOp);
+    if (packetReceived != 0 )
+    {
+      for(i=0; i< packetReceived; ++i)
+      {
+        //Get element index i on the STREAM ITEM.
+        pRxStreamItem = STAR_getTransferItem (pRxTransferOp, i);
+        if (pRxStreamItem != NULL && pRxStreamItem->item != NULL &&
+            pRxStreamItem->itemType == STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET)
+        {
+          //Add to file instead of printf.
+          processPacket( pRxStreamItem->item);
+        }
+      }
+    }
+
+  }
+
+  if (pRxTransferOp != NULL)
+    STAR_disposeTransferOperation(pRxTransferOp);
+
+  //  pthread_exit(0);
+  printf("End of thread RX.\n");
+  
+  return 0;
+}
+
 int __cdecl  main(int argc, char * argv[]){
   STAR_DEVICE_ID* devices;
   STAR_DEVICE_ID deviceId;
   unsigned int deviceCount;
 
+  const uint32_t threads_nr = 0;
+  const uint32_t max_threads_nr = 16;
+  pthread_t threads[max_threads_nr];
+
 
   if (argc < 2)
     {
-      printf ("Usage: ./%s reg_address.\n", argv[0]);
-      printf ("reg_address: Address to read in hexadecimal, beginning with 0x.\n");
-      return 0;
+      printf ("Usage: ./%s period.\n", argv[0]);
+      printf ("period: Period of the timecode in hexadecimal, beginning with 0x.\n");
+      //      return 0;
   }
+  else
+  {
 
-  char address[] = {0x00, 0x00, 0x00, 0x00};    
-  //Use "0x" to define the base of the number.
-  if (strncmp(argv[1], "0x",2) != 0)
+    char address[] = {0x00, 0x00, 0x00, 0x00};
+    //Use "0x" to define the base of the number.
+    if (strncmp(argv[1], "0x",2) != 0)
     {
       printf("Usage: ./%s address.\n", argv[1]);
       printf("The address should be in hexadecimal. 0xFFFFFFFF.");
       return 0;
     }
-  uint32_t reg_address = strtoul(argv[1], NULL, 16);
-  printf ("Proceed to read 0x%x : .\n", reg_address);
-	    
+    uint32_t reg_address = strtoul(argv[1], NULL, 16);
+    printf ("Proceed to read 0x%x : .\n", reg_address);
+  }
+
   //Initialize
   devices = STAR_getDeviceListForType(STAR_DEVICE_TXRX_SUPPORTED, & deviceCount);
   if (devices == NULL){
@@ -108,12 +272,12 @@ int __cdecl  main(int argc, char * argv[]){
   /*        Configurate Baudrate                                 */
   /*                                                             */
   /* Channel 1 = Transmit interface                              */
-  /* Channel 2 = Receive  interface                              */
+  /*
   /* BaudRate  = 100 Mbps (100*2/4)*2                            */
   /* Packet Size = 1 KB                                          */
   /***************************************************************/
-  STAR_CHANNEL_ID testPortChannel, testPortChannel2;
-  STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams;
+  STAR_CHANNEL_ID testPortChannel;
+  STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams; 
 
   int status_link = 0;
   clockRateParams.multiplier = _TX_BAUDRATE_MUL;
@@ -124,27 +288,24 @@ int __cdecl  main(int argc, char * argv[]){
     puts("\nError: Could not configure baudrate.");
     return 0;
   }
-
-  status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, _SPW2_INTERFACE, clockRateParams);
-  if ( status_link == 0){
-    puts("\nError: Could not configure baudrate.");
-    return 0;
-  }
   
   testPortChannel = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_INOUT, _SPW1_INTERFACE, TRUE);
   if(testPortChannel == 0){
     puts("\nError : Unable to open the Channel.");
   }
 
-  testPortChannel2 = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_INOUT, _SPW2_INTERFACE, TRUE);
-  if(testPortChannel2 == 0){
-    puts("\nError : Unable to open the Channel.");
-  } 
- 
   puts("\nChannel Spw 1 Opened and ready to communicate.  ");
-  puts("\nChannel Spw 2 Opened and ready to communicate.  ");
   puts("\n************************************************\n");
 
+  /* Enable the device as a time-code master */
+  if (CFG_MK2_enableTimeCodeMaster(deviceId))
+  {
+    puts("Device enabled as a time-code master");
+  }
+  else
+  {
+    puts("Error enabling device as a time-code master");
+  }
   /*****************************************************************/
   /*    Allocate memory for the transmit buffer and construct      */
   /*    the packet to transmit.                                    */
@@ -155,139 +316,52 @@ int __cdecl  main(int argc, char * argv[]){
   /* The Read Commands data size is always 1 register each time,   */
   /* that is 4 byte per command.                                   */
   /*****************************************************************/
-  /*       Create the Transmit and Receive Operations              */
-  STAR_TRANSFER_OPERATION **pConfigRouterTransferOp = NULL;
-  STAR_TRANSFER_OPERATION *pTxTransferOp = NULL, *pRxTransferOp = NULL;
-  STAR_STREAM_ITEM **vTxStreamItem = NULL;
-  unsigned int rxOp_itemCount= 0, txOp_itemCount = 0, txRTPOP_Itemcount= 0;
-  U8 pData[4];
-  unsigned long byteSize =  0;
- 
-  uint32_t number_of_items = 1;
-  //Allocate Memory for TxStream Items
-  vTxStreamItem = malloc(number_of_items* sizeof( STAR_STREAM_ITEM));
-  if (!vTxStreamItem){
-    puts("\nError: Could not allocate memory for the packet array.");    
-    return 0;    
-  }
 
-  uint32_t status;
-  status =  GR718_ReadRegister(vTxStreamItem, reg_address);
-  if (status != 0){
-    printf("Error generating the Stream.");
-    return 0;
-  }
+  struct thread_info timecode_params, tinfo;
+  pthread_attr_t attr;
+  uint32_t thread_status;
 
-  /* Create the transmit transfer operation for the packet */
-  pTxTransferOp = STAR_createTxOperation(vTxStreamItem, number_of_items);
-  if (pTxTransferOp == NULL)
-    {
-      puts("\nERROR: Unable to create the transfer operation to be transmitted");
-      return 0;
-    }
-  else{
-    printf("Tx operation created. \n");
-  }
+  //main should wait for threads before free resources, closing channel.
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-  //Dispose the stream items.
-  uint32_t it = 0;
-  if (vTxStreamItem != NULL){
-    for (it = 0; it < number_of_items; ++it)
-      {
-	free(vTxStreamItem[it]);
-      }
-    free(vTxStreamItem);
-  }
+  //Lets create a Trhead to manage the RX operations.
+  tinfo.channelId = testPortChannel;
+  strcpy(tinfo.threadName, "Receiv");
   
+  timecode_params.channelId = testPortChannel;
+  strcpy (timecode_params.threadName, "TimeCodeMaster");
 
-  // Create an RX operation to receive the Packet on port 2.
-  
-  /* Create the transfer operations. */
-  pRxTransferOp = STAR_createRxOperation(number_of_items , STAR_RECEIVE_PACKETS);
-  if (pRxTransferOp == NULL)
-    {
-      puts("\nERROR: Unable to create receive operation");
-      return 0;
-    }
-
-  /***************************************************************/
-  /*    Submit the operations                                    */
-  /*                                                             */
-  /***************************************************************/
-
-  /* Submit the transmit operation */
-  if (STAR_submitTransferOperation(testPortChannel, pTxTransferOp) == 0) {
-    printf("\nERROR occurred during transmit.  Test failed.\n");
+  thread_status = pthread_create(& (tinfo.threadId), &attr, 
+				  rx_thread, (void *) & tinfo);
+  if (thread_status){
+    printf("Error createing the RX thread.\n");
     return 0;
   }
 
-  //Wait the operations to finish.
-  STAR_TRANSFER_STATUS rxStatus, txStatus;
-
-  /* Wait on the transmit operation completing */
-  txStatus = STAR_waitOnTransferOperationCompletion(pTxTransferOp,
-						    STAR_INFINITE);
-  if(txStatus != STAR_TRANSFER_STATUS_COMPLETE) 
+  thread_status = pthread_create(& timecode_params.threadId, &attr, 
+				 timecode_thread,(void *) &timecode_params);
+  if (thread_status)
     {
-    printf("\nERROR occurred during transmit.  Test failed.\n");
-    return 0;
+      printf("Error creating TX thread.\n");
     }
 
-  /* Submit the receive operation */
-  if (STAR_submitTransferOperation(testPortChannel, pRxTransferOp) == 0)
-    {
-      printf("\nERROR occurred during receive.  Test Tfailed.\n");
-      return 0;
-    }
+  printf ("Threads create.\n");
 
-  printf ("RX opReady.\n");
+  void *st;
+  pthread_join(timecode_params.threadId, NULL);
+  pthread_join(tinfo.threadId, NULL);
 
-
-  /* Wait on the receive operation completing */
-  rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
-						    STAR_INFINITE);
-  if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
-    {
-      printf("\nERROR occurred during receive.  Test failed.\n");
-      return 0;
-    }
-
-  processRxOperation((STAR_TRANSFER_OPERATION *) pRxTransferOp);
-
-  if (pRxTransferOp != NULL)
-    STAR_disposeTransferOperation(pRxTransferOp);
-
-  /* Dispose of the transfer operations */
-  if (pTxTransferOp != NULL) {
-    STAR_disposeTransferOperation(pTxTransferOp);
-  }
+  printf("End of threads.\n\n");
 
   /* Close the channels */
   if (testPortChannel != 0U) {
     STAR_closeChannel(testPortChannel);
   }
-
-  if (testPortChannel2 != 0U) {
-    STAR_closeChannel(testPortChannel2);
-  }
-
+  //    pthread_exit(NULL);
+    exit(0);
 
 }
-
-
-/* possible structure for Gr718Packet??
-typedef struct rmapPacket{
-  uint32_t * pTarget;
-  uint32_t trgtPathLength;
-  uint32_t * pReply;
-  uint32_t rplyPathLength;
-  uint32_t * pData;
-  uint32_t dataSize;
-  U8 srv;
-  
-};
-*/
-
 
 uint32_t processPacket( STAR_SPACEWIRE_PACKET * streamItemPacket){
   uint8_t *pStreamData = NULL;
@@ -300,14 +374,7 @@ uint32_t processPacket( STAR_SPACEWIRE_PACKET * streamItemPacket){
 
   
   pStreamItemAddress = STAR_getPacketAddress ( (STAR_SPACEWIRE_PACKET *) streamItemPacket);
-  if ( pStreamItemAddress != NULL){
-    printf("Addres PATH: ");
-    for(i=0; i< pStreamItemAddress->pathLength; ++i)
-      printf( "\t0x%x", *(pStreamItemAddress->pPath + i) );
-    printf("\n");
-  }
 
-  //  if (
   for (i=0; i<streamDataSize; ++i)
     {
       printf( "\t0x%x" ,pStreamData[i]);
@@ -316,6 +383,9 @@ uint32_t processPacket( STAR_SPACEWIRE_PACKET * streamItemPacket){
 	  printf("\n");
 	}
     }
+
+  printf("\n");
+
   STAR_destroyAddress(pStreamItemAddress);
   STAR_destroyPacketData(pStreamData);
   
@@ -371,7 +441,7 @@ uint32_t processRxOperation(STAR_TRANSFER_OPERATION * const pTransferOp)
 		{
 		case STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET:
 		  printf("SpaceWire Packet Received.\n");
-		  processPacket((STAR_SPACEWIRE_PACKET *) pRxStreamItem->item);		  
+		  //processPacket((STAR_SPACEWIRE_PACKET *) pRxStreamItem->item);		  
 		  processRegister( pRxStreamItem->item);
 		  break;
 		case STAR_STREAM_ITEM_TYPE_TIMECODE:
@@ -401,7 +471,7 @@ uint32_t GR718_ReadRegister(STAR_STREAM_ITEM **pTxStreamItem, uint32_t reg_addr)
   unsigned long fillPacketLenCalculated, fillPacketLen;  
   
   U8 pTarget[] = {0,254};
-  U8 pReply[] = {0x21};
+  U8 pReply[] = {254};
   char status;  
   
   /* Calculate the length of a write command packet, with 4 bytes of data */
@@ -416,8 +486,8 @@ uint32_t GR718_ReadRegister(STAR_STREAM_ITEM **pTxStreamItem, uint32_t reg_addr)
       return 1;
     }
   
-  status = RMAP_FillReadCommandPacket(pTarget, 2, pReply, 1, 1, 0x00,
-				     0x13, reg_addr, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
+  status = RMAP_FillReadCommandPacket(pTarget, 2, pReply, 1, 0, 0x00,
+				      0, reg_addr, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 				       fillPacketLenCalculated);
   if (!status)
     {
