@@ -1,0 +1,30 @@
+
+Reply Example: 0xfe	0x1	0x8	0x0	0xfe	0x0	0x0	0x0
+			   0x0	0x0	0x4	0x92	0x0	0x0	0x0	0x2
+				0xe3
+
+First byte transmitted
+Reply SpW Address	
+....
+Byte 	| Desc.							| Value
+0 		| Reply SpW Address				|
+1 		| Initiator Logical Address 	|	0xFE
+2 		| Protocol Identifier 			|	0x01
+3 		| Instruction  					|	0x08
+4 		| Status  						|	0x00
+
+5		| Target Logical Address 		|	0xFE  
+6 		| Transaction Identifier (MS) 	|	0x00
+7		| Transaction Identifier (LS) 	|	0x00
+8 		| Reserved = 0					|	0x00
+
+9		| Data Length (MS)				|	0x00
+10		| Data Length 					|	0x00
+11		| Data Length (LS) 				|	0x04			<- Data Size 4
+12		| Header CRC					|	0x92
+13 -	| Data 							|	0x00 0x00 0x00 0x02
+19		| CRC							|	0xE3
+EOP
+
+===
+Last byte transmitted

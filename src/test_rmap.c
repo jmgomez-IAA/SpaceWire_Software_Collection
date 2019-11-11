@@ -2,11 +2,10 @@
   @file test_rmap.c
   @author Juan Manuel Gómez
   @brief Demostration RMAP packet to configure GR718 
-  @details Demostrates how to configure GR718B using RMAP packets. The   
-  configuration port is at SpaceWire Addr 0 and support RMAP
-  target packet. The Register are memory mapped, and could be
-  initalized through RMAP Write commands.
-  @param No parammeters needed.
+  @details 
+  @param address Address of the register to load.
+  @param value
+  #return The value of the register or the error code in case of problems.
   @example ./test_rmap  
   @copyright jmgomez CSIC-IAA
 */
@@ -26,112 +25,30 @@
 
 #include <errno.h>
 
+
+/**
+* Default values for the configuration
+* ====================================
+*/
+// Operation timeout.
 #define STAR_INFINITE 30000
 
+// Interface operation.
 #define _TX_INTERFACE 1
 #define _RX_INTERFACE 2
+
+// Default packet size.
 #define _PACKET_SIZE 64
 
+// Interface Baudrate configuraiton: 100 Mbps
 #define _TX_BAUDRATE_MUL 2
 #define _TX_BAUDRATE_DIV 4
 #define _RX_BAUDRATE_MUL 2
 #define _RX_BAUDRATE_DIV 4
 
+// Default address path.
 #define _ADDRESS_PATH 2
 #define _ADDRESS_PATH_SIZE 1
-
-
-/******************************************************************/
-/*                                                                */
-/******************************************************************/
-void write_command_packet_example()
-{
-  void *pFillPacket, *pBuildPacket, *pBuildPacketRegister;
-  unsigned long fillPacketLenCalculated, fillPacketLen;
-  unsigned long buildPacketLen, buildPacketRegisterLen;
-  U8 pTarget[] = {0, 254};
-  U8 pReply[] = {254};
-  U8 pData[] = {0x12, 0x34, 0x56, 0x78};
-  char status;
-  /* Calculate the length of a write command packet, with 4 bytes of data */
-  fillPacketLenCalculated = RMAP_CalculateWriteCommandPacketLength(2, 1, 4,
-								   1);
-  printf("The write command packet will have a length of %ld bytes\n",
-	 fillPacketLenCalculated);
-  /* Allocate memory for the packet */
-  pFillPacket = malloc(fillPacketLenCalculated);
-  if (!pFillPacket)
-    {
-      puts("Couldn't allocate the memory for the command packet");
-      return;
-    }
-  /* Fill the memory with the packet */
-  status = RMAP_FillWriteCommandPacket(pTarget, 2, pReply, 1, 1, 1, 0, 0x20,
-				       0, 0x106, 0, pData, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
-				       fillPacketLenCalculated);
-  if (!status)
-    {
-      puts("Couldn't fill the write command packet");
-      free(pFillPacket);
-      return;
-    }
-  /* Build an RMAP write command packet to write 4-bytes */
-  pBuildPacket = RMAP_BuildWriteCommandPacket(pTarget, 2, pReply, 1, 1, 1, 0,
-					      0x20, 0, 0x106, 0, pData, 4, &buildPacketLen, NULL, 1);
-  if (!pBuildPacket)
-    {
-      puts("Couldn't build the write command packet");
-      free(pFillPacket);
-      return;
-    }
-  /* Build an RMAP write command packet to write to a 4-byte register */
-  pBuildPacketRegister = RMAP_BuildWriteRegisterPacket(pTarget, 2, pReply, 1,
-						       1, 1, 0, 0x20, 0, 0x106, 0, 0x12345678, &buildPacketRegisterLen, NULL,
-						       1);
-  if (!pBuildPacketRegister)
-    {
-      puts("Couldn't build the write register packet");
-      RMAP_FreeBuffer(pBuildPacket);
-      free(pFillPacket);
-      return;
-    }
-  /* Check the lengths are all the same */
-  if ((fillPacketLenCalculated != fillPacketLen) ||
-      (fillPacketLen != buildPacketLen) ||
-      (buildPacketLen != buildPacketRegisterLen))
-    {
-      puts("The lengths are different:");
-      printf("\tLength calculated for packet: %ld\n",
-	     fillPacketLenCalculated);
-      printf("\tLength of filled packet: %ld\n", fillPacketLen);
-      printf("\tLength of built packet: %ld\n", buildPacketLen);
-      printf("\tLength of built register packet: %ld\n", buildPacketLen);
-    }
-  else
-    {
-      puts("The packet lengths are all the same.");
-      /* Check the packets are identical, despite being built differently */
-      if (memcmp(pFillPacket, pBuildPacket, fillPacketLen) != 0)
-        {
-	  puts("The filled packet is different to the built packet.");
-        }
-      else if (memcmp(pFillPacket, pBuildPacketRegister, fillPacketLen) != 0)
-        {
-	  puts("The built register packet is different to the built packet and the filled packet.");
-        }
-      else
-        {
-	  puts("The packets are identical.");
-        }
-    }
-  /* Free the memory allocated for each of the packets.  Note that the */
-  /* memory allocated by the library should be freed by calling */
-  /* RMAP_FreeBuffer. */
-  RMAP_FreeBuffer(pBuildPacketRegister);
-  RMAP_FreeBuffer(pBuildPacket);
-  free(pFillPacket);
-}
-
 
 /******************************************************************/
 /*                                                                */
@@ -151,6 +68,9 @@ int __cdecl main(int argc, char *argv[]){
   STAR_CHANNEL_ID rxChannelId = 0U, txChannelId = 0U;
   STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams;
 
+  /**
+   * Parse arguments.
+  */
 
   /***************************************************************/
   /*        Configuration                                        */
@@ -160,7 +80,6 @@ int __cdecl main(int argc, char *argv[]){
   /* BaudRate  = 100 Mbps (100*2/4)*2                            */
   /* Packet Size = 1 KB                                          */
   /***************************************************************/
-
   txChannelNumber = _TX_INTERFACE;
   rxChannelNumber = _RX_INTERFACE;
   clockRateParams.multiplier = _TX_BAUDRATE_MUL;
@@ -248,13 +167,16 @@ int __cdecl main(int argc, char *argv[]){
   char status;
 
   byteSize = _PACKET_SIZE;
-
-				       
-  /* Calculate the length of a write command packet, with 4 bytes of data */
+  
+  /* Calculate the length of a 
+    **write command packet**, with 4 bytes of data 
+  */
   fillPacketLenCalculated = RMAP_CalculateWriteCommandPacketLength(2, 1, 4,
 								   1);
+
   printf("The write command packet will have a length of %ld bytes\n",
-	 fillPacketLenCalculated);
+	      fillPacketLenCalculated);
+
   /* Allocate memory for the packet */
   pFillPacket = malloc(fillPacketLenCalculated);
   if (!pFillPacket)
@@ -263,8 +185,7 @@ int __cdecl main(int argc, char *argv[]){
       return;
     }
 
-  /* Fill the memory with the packet */
-  
+  /* Fill the memory with the packet */  
   status = RMAP_FillWriteCommandPacket(pTarget, 2, pReply, 1, 1, 0, 0, 0x00,
 				       0, 0x820, 0, pData, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 				       fillPacketLenCalculated);
@@ -274,19 +195,7 @@ int __cdecl main(int argc, char *argv[]){
       free(pFillPacket);
       return;
     }
-  
-  /* Build an RMAP write command packet to write 4-bytes */
-  // pReply
-  /*
-  pBuildPacket = RMAP_BuildWriteCommandPacket(pTarget, 1, pReply, 1, 0, 0, 0,
-					      0x20, 0, 0x808, 0, pData, 4, &buildPacketLen, NULL, 1);
-  if (!pBuildPacket)
-    {
-      puts("Couldn't build the write command packet");
-      free(pFillPacket);
-      return;
-    }
-  */
+
   STAR_TRANSFER_OPERATION *pTxTransferOp = NULL, *pRxTransferOp = NULL;
   STAR_STREAM_ITEM *pTxStreamItem = NULL;
    
@@ -297,11 +206,6 @@ int __cdecl main(int argc, char *argv[]){
       puts("\nERROR: Unable to create receive operation");
       return 0;
     }
-
-
-  /* Create the packet to be transmitted */
-  //  pTxStreamItem = STAR_createPacket(NULL, (U8 *)pBuildPacket, buildPacketLen,
-  //				    STAR_EOP_TYPE_EOP);
 
   pTxStreamItem = STAR_createPacket(NULL, (U8 *)pFillPacket, fillPacketLen,
 				    STAR_EOP_TYPE_EOP);
@@ -376,7 +280,6 @@ int __cdecl main(int argc, char *argv[]){
       STAR_disposeTransferOperation(pRxTransferOp);
     }
 
-
   if (pFillPacket != NULL){
     RMAP_FreeBuffer(pFillPacket);
     }
@@ -393,8 +296,3 @@ int __cdecl main(int argc, char *argv[]){
 
   return 0;
 }
-
-
-
-
-
