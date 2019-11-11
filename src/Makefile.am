@@ -1,4 +1,4 @@
-bin_PROGRAMS = loopback rmap rd_rmap stipa la_routing route_NDPU load apus la2_routing conf_router receiv timecode
+bin_PROGRAMS = loopback rmap rd_rmap stipa la_routing route_NDPU load apus la2_routing conf_router receiv timecode disable_if
 loopback_SOURCES = test_loopback.c utility.c
 loopback_LDADD = -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api
 
@@ -34,3 +34,6 @@ receiv_LDADD  =  -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_r
 
 timecode_SOURCES = test_timecode.c utility.c
 timecode_LDADD  = -lpthread -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api -lrmap_packet_library
+
+disable_if_SOURCES = disable_if.c utility.c
+disable_if_LDADD  = -lpthread -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api -lrmap_packet_library

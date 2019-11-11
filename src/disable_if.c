@@ -1,12 +1,12 @@
 /*
-  @file test_read_rmap.c
+  @file test_rmap.c
   @author Juan Manuel Gómez
-  @brief Demostration RMAP packet to configure GR718 
-  @details Demostrates how to configure GR718B using RMAP packets. The   
+  @brief Demostration RMAP packet to disable the GR718  if.
+  @details Demostrates how to disable a GR718B IF using RMAP packets. The   
   configuration port is at SpaceWire Addr 0 and support RMAP
   target packet. The Register are memory mapped, and could be
   initalized through RMAP Write commands.
-  @param No parammeters needed.
+  @param if Interface to disable
   @example ./test_rmap  
   @copyright jmgomez CSIC-IAA
 */
@@ -39,78 +39,6 @@
 
 #define _ADDRESS_PATH 2
 #define _ADDRESS_PATH_SIZE 1
-
-void printPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket){
-    unsigned char* pTxStreamData = NULL;
-    STAR_SPACEWIRE_ADDRESS *pStreamItemAddress = NULL;
-    unsigned int pTxStreamDataSize = 0, i;
-    pTxStreamData = STAR_getPacketData(
-                    (STAR_SPACEWIRE_PACKET *)StreamItemPacket,
-                    &pTxStreamDataSize);	
-
-    pStreamItemAddress =  STAR_getPacketAddress ( (STAR_SPACEWIRE_PACKET *)StreamItemPacket);
-/*
-    printf("Packet  Address Path [Size: %d]\n", pStreamItemAddress->pathLength);
-    printf("===================\n");
-    for(i=0; i < pStreamItemAddress->pathLength ; ++i){
-    	printf( "\t0x%x" ,pStreamItemAddress->pPath[i]);
-	if (!((i+1) % 8 ) ){
-	    printf("\n");
-	}
-    }
-*/
-	    printf("\n");
-
-    printf("Packet  Data\n");
-    printf("===================\n");
-    for ( i= 0; i < pTxStreamDataSize; ++i){
-    	printf( "\t0x%x" ,pTxStreamData[i]);
-	if (!((i+1) % 8 ) ){
-	    printf("\n");
-	}
-    }
-
-    STAR_destroyAddress(pStreamItemAddress);
-    STAR_destroyPacketData(pTxStreamData);
-}
-
-
-unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp)
-{
-  unsigned long i;
-  unsigned int rxPacketCount;
-  STAR_STREAM_ITEM *pRxStreamItem;
-
-  /* Get the number of traffic items received */
-  rxPacketCount = STAR_getTransferItemCount(pTransferOp);
-  if (rxPacketCount == 0)
-    {
-      printf("No packets received.\n");
-    }
-  else
-    {
-      /* For each traffic item received */
-      for (i = 0U; i < rxPacketCount; i++)
-        {
-	  /* Get the packet */
-	  pRxStreamItem = STAR_getTransferItem(pTransferOp, i);
-	  if ((pRxStreamItem == NULL) || (pRxStreamItem->itemType !=
-					  STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) ||
-	      (pRxStreamItem->item == NULL))
-            {
-	      printf("\nERROR received an unexpected traffic type, or empty traffic item in item %lu\n",
-		     i);
-            }
-	  else
-            {
-	      printPacket( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
-            }
-        }
-    }
-
-  /* Return the error count */
-  return rxPacketCount;
-}
 
 
 /******************************************************************/
@@ -195,7 +123,7 @@ int __cdecl main(int argc, char *argv[]){
   }
 
   /* Open channel 1 for Transmit*/
-  txChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_INOUT,
+  txChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_OUT,
 					      txChannelNumber, TRUE);
   if (txChannelNumber == 0U)
     {
@@ -224,15 +152,16 @@ int __cdecl main(int argc, char *argv[]){
   unsigned long buildPacketLen;
   U8 pTarget[] = {0,254};
   U8 pReply[] = {254};
-  U8 pData[] = {0x00, 0x14, 0x02, 0x2E};
+  U8 pData[] = {0x00, 0x14, 0x04, 0xF0};
   char status;
 
   byteSize = _PACKET_SIZE;
 
 				       
   /* Calculate the length of a write command packet, with 4 bytes of data */
-  fillPacketLenCalculated = RMAP_CalculateReadCommandPacketLength(2, 1,1);
-  printf("The Read command packet will have a length of %ld bytes\n",
+  fillPacketLenCalculated = RMAP_CalculateWriteCommandPacketLength(2, 1, 4,
+								   1);
+  printf("The write command packet will have a length of %ld bytes\n",
 	 fillPacketLenCalculated);
   /* Allocate memory for the packet */
   pFillPacket = malloc(fillPacketLenCalculated);
@@ -242,15 +171,9 @@ int __cdecl main(int argc, char *argv[]){
       return;
     }
 
-  /* Fill the memory with the packet */
-  /*
-
-    status = RMAP_FillReadCommandPacket(pTarget, 2, pReply, 1, 0, 0x20, 0,
-        0x106, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
-        fillPacketLenCalculated);
-   */
-  status = RMAP_FillReadCommandPacket(pTarget, 2, pReply, 1, 0, 0x00,
-				      0, 0xA40, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
+  /* Fill the memory with the packet */  
+  status = RMAP_FillWriteCommandPacket(pTarget, 2, pReply, 1, 1, 0, 0, 0x00,
+				       0, 0x800, 0, pData, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 				       fillPacketLenCalculated);
   if (!status)
     {
@@ -269,11 +192,6 @@ int __cdecl main(int argc, char *argv[]){
       puts("\nERROR: Unable to create receive operation");
       return 0;
     }
-
-
-  /* Create the packet to be transmitted */
-  //  pTxStreamItem = STAR_createPacket(NULL, (U8 *)pBuildPacket, buildPacketLen,
-  //				    STAR_EOP_TYPE_EOP);
 
   pTxStreamItem = STAR_createPacket(NULL, (U8 *)pFillPacket, fillPacketLen,
 				    STAR_EOP_TYPE_EOP);
@@ -297,6 +215,13 @@ int __cdecl main(int argc, char *argv[]){
   /*                                                             */
   /***************************************************************/
 
+  /* Submit the receive operation */
+  if (STAR_submitTransferOperation(rxChannelId, pRxTransferOp) == 0)
+    {
+      printf("\nERROR occurred during receive.  Test Tfailed.\n");
+      return 0;
+    }
+
   /* Submit the transmit operation */
   if (STAR_submitTransferOperation(txChannelId, pTxTransferOp) == 0)
     {
@@ -316,15 +241,6 @@ int __cdecl main(int argc, char *argv[]){
       return 0;
     }
 
-
-  /* Submit the receive operation */
-  if (STAR_submitTransferOperation(txChannelId, pRxTransferOp) == 0)
-    {
-      printf("\nERROR occurred during receive.  Test Tfailed.\n");
-      return 0;
-    }
-
-
   /* Wait on the receive operation completing */
   rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
 						    STAR_INFINITE);
@@ -333,9 +249,6 @@ int __cdecl main(int argc, char *argv[]){
       printf("\nERROR occurred during receive.  Test failed.\n");
       return 0;
     }
-
-  printRxPackets((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
-
 
   /****************************************************************/
   /*    Free the resource                                         */
