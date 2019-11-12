@@ -18,15 +18,244 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#if defined(__vxworks)
-    #include <memLib.h>
-#else
-    #include <malloc.h>
-#endif
+
+#include <malloc.h>
 #include <string.h>
 #include <errno.h>
 
 #include "utility.h"
+
+
+
+unsigned int reverse_4bytes_array(unsigned int lsb_integer)
+{
+    unsigned int tmp = 0;
+    
+    tmp = ((lsb_integer & 0x000000FF) << 24) | ((lsb_integer & 0x0000FF00) << 8) | ((lsb_integer & 0x00FF0000) >> 8) | lsb_integer >> 24;
+    return (tmp);
+}
+
+/**
+* Process the receive message and outputs
+*/
+
+/* Display the type of a packet. */
+void display_packet_type(RMAP_PACKET_TYPE type)
+{
+    switch (type)
+    {
+        case RMAP_WRITE_COMMAND:
+            puts("The packet is an RMAP write command.");
+            break;
+        
+        case RMAP_WRITE_REPLY:
+            puts("The packet is an RMAP write reply.");
+            break;
+        
+        case RMAP_READ_COMMAND:
+            puts("The packet is an RMAP read command.");
+            break;
+        
+        case RMAP_READ_REPLY:
+            puts("The packet is an RMAP read reply.");
+            break;
+        
+        case RMAP_READ_MODIFY_WRITE_COMMAND:
+            puts("The packet is an RMAP read/modify/write command.");
+            break;
+        
+        case RMAP_READ_MODIFY_WRITE_REPLY:
+            puts("The packet is an RMAP read/modify/write reply.");
+            break;
+        
+        case RMAP_INVALID_PACKET_TYPE:
+            puts("The packet is of an invalid RMAP packet type.");
+            break;
+            
+        default:
+            puts("The packet is of an unexpected type.");
+    }
+}
+
+/* Display the status of a packet. */
+void display_packet_status(RMAP_STATUS status)
+{
+    switch (status)
+    {
+        case RMAP_SUCCESS:
+            puts("The status indicates the command completed successfully.");
+            break;
+        case RMAP_GENERAL_ERROR:
+            puts("The status indicates a general error that does not fit into the other error cases.");
+            break;
+        case RMAP_UNUSED_PACKET_TYPE_OR_COMMAND_CODE:
+            puts("The status indicates the packet type or command is an unexpected value.");
+            break;
+        case RMAP_INVALID_KEY:
+            puts("The status indicates the key did not match that expected by the target user application.");
+            break;
+        case RMAP_INVALID_DATA_CRC:
+            puts("The status indicates an invalid data CRC.");
+            break;
+        case RMAP_EARLY_EOP:
+            puts("The status indicates an EOP was detected before the end of the data.");
+            break;
+        case RMAP_TOO_MUCH_DATA:
+            puts("The status indicates there was more data than was expected.");
+            break;
+        case RMAP_EEP:
+            puts("The status indicates an EEP was  encountered in the packet after the header.");
+            break;
+        case RMAP_VERIFY_BUFFER_OVERRUN:
+            puts("The status indicates verify before write was enabled in the command but not enough buffer space was available to receive the full command.");
+            break;
+        case RMAP_COMMAND_NOT_IMPLEMENTED_OR_AUTHORISED:
+            puts("The status indicates the target user application did not authorise the requested operation.");
+            break;
+        case RMAP_RMW_DATA_LENGTH_ERROR:
+            puts("The status indicates the amount of data in a read/modify/write command is invalid.");
+            break;
+        case RMAP_INVALID_TARGET_LOGICAL_ADDRESS:
+            puts("The status indicates the target logical address was not the value expected by the target.");
+            break;
+        default:
+            puts("The status is an unexpected value.");
+    }
+}
+
+void dumpPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket){
+    unsigned char* pTxStreamData = NULL;
+    STAR_SPACEWIRE_ADDRESS *pStreamItemAddress = NULL;
+    unsigned int pTxStreamDataSize = 0, i;
+    pTxStreamData = STAR_getPacketData(
+                    (STAR_SPACEWIRE_PACKET *)StreamItemPacket,
+                    &pTxStreamDataSize);    
+
+    pStreamItemAddress =  STAR_getPacketAddress ( (STAR_SPACEWIRE_PACKET *)StreamItemPacket);
+        printf("\n");
+
+    printf("Packet  Data\n");
+    printf("===================\n");
+    for ( i= 0; i < pTxStreamDataSize; ++i){
+        printf( "\t0x%x" , pTxStreamData[i]);
+    if (!((i+1) % 8 ) ){
+        printf("\n");
+    }
+    }
+
+    STAR_destroyAddress(pStreamItemAddress);
+    STAR_destroyPacketData(pTxStreamData);
+}
+
+
+void printReply(STAR_SPACEWIRE_PACKET * StreamItemPacket)
+{
+
+    rmap_reply_header_t rply_header;
+    rmap_reply_data_t rply_data;
+    unsigned char* pTxStreamData = NULL;
+    STAR_SPACEWIRE_ADDRESS *pStreamItemAddress = NULL;
+    unsigned int pTxStreamDataSize = 0, i;
+
+    // Get the Data of the packet
+    pTxStreamData = STAR_getPacketData(
+                    (STAR_SPACEWIRE_PACKET *)StreamItemPacket,
+                    &pTxStreamDataSize);  
+
+    pStreamItemAddress =  STAR_getPacketAddress ( (STAR_SPACEWIRE_PACKET *)StreamItemPacket);
+
+    rply_header.init_address        = pTxStreamData[0];
+    rply_header.protocol_id         = pTxStreamData[1];           //  Byte 2
+    rply_header.instruction_field   = pTxStreamData[2];     //  Byte 3
+    rply_header.cmd_status          = pTxStreamData[3];            //  Byte 4
+    rply_header.target_addr         = pTxStreamData[4];           //  Byte 5
+    rply_header.tans_ident          = pTxStreamData[5]<<8 | pTxStreamData[6];           //  Byte 6-7
+    rply_header.reserved_1          = pTxStreamData[7];           //  Byte 8
+    rply_header.data_length         = pTxStreamData[8]<<16 | pTxStreamData[9]<<8 | pTxStreamData[10];           //  Byte 9,10,11
+    rply_header.header_crc          = pTxStreamData[11];             //  Byte 12
+
+    rply_data.data_length = rply_header.data_length;
+    rply_data.data_chunk = malloc (rply_data.data_length );
+    if (rply_data.data_chunk != NULL)
+    {
+      memcpy(rply_data.data_chunk, pTxStreamData+RPLY_PACKET_DATA_OFFSET, rply_data.data_length);
+
+      printf("\n");
+      printf(" RAMP REPLY PACKET \n");
+      printf("===================\n");
+      printf("\nFirst byte transmitted.\nReply SpW Address\n .... ");
+      printf("\nByte\t| Description\t\t\t| Value");
+      printf("\n0\t| Reply SpW Address\t\t| ");
+      printf("\n1\t| Initiator Logical Address\t| 0x%02X", rply_header.init_address);
+      printf("\n2\t| Protocol Identifier\t\t| 0x%02X", rply_header.protocol_id);
+      printf("\n3\t| Instruction\t\t\t| 0x%02X" , rply_header.instruction_field);
+      printf("\n4\t| Status\t\t\t| 0x%02X", rply_header.cmd_status);
+      printf("\n5\t| Target Logical Address\t| 0x%02X", rply_header.target_addr);
+      printf("\n6-7\t| Transaction Identifier \t| 0x%04X", rply_header.tans_ident);
+      printf("\n8\t| Reserved = 0\t\t\t| 0x%02X", rply_header.reserved_1);
+      printf("\n9-11\t| Data Length\t\t\t| 0x%06X", rply_header.data_length);
+      printf("\n12\t| Header CRC\t\t\t| 0x%02X", rply_header.header_crc);
+
+      printf("\n Data\n");
+
+      for( i = 0; i < rply_data.data_length; ++i)
+      {
+        rply_data.data_chunk[i];
+        printf( "\t0x%02X" , rply_data.data_chunk[i]);
+
+        if (!((i+1) % 8 ) )
+        {
+          printf("\n");
+        }        
+      }
+
+      printf("\n..................\n");
+    }
+    
+    free(rply_data.data_chunk);
+
+    STAR_destroyAddress(pStreamItemAddress);
+    STAR_destroyPacketData(pTxStreamData);
+}
+
+unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp)
+{
+  unsigned long i;
+  unsigned int rxPacketCount;
+  STAR_STREAM_ITEM *pRxStreamItem;
+
+  /* Get the number of traffic items received */
+  rxPacketCount = STAR_getTransferItemCount(pTransferOp);
+  if (rxPacketCount == 0)
+    {
+      printf("No packets received.\n");
+    }
+  else
+    {
+      /* For each traffic item received */
+      for (i = 0U; i < rxPacketCount; i++)
+        {
+      /* Get the packet */
+      pRxStreamItem = STAR_getTransferItem(pTransferOp, i);
+      if ((pRxStreamItem == NULL) || (pRxStreamItem->itemType !=
+                      STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) ||
+          (pRxStreamItem->item == NULL))
+            {
+          printf("\nERROR received an unexpected traffic type, or empty traffic item in item %lu\n",
+             i);
+            }
+      else
+            {
+          printReply( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
+        //dumpPacket( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
+            }
+        }
+    }
+
+  /* Return the error count */
+  return rxPacketCount;
+}
+
 
 /******************************************************************************/
 /*                                                                            */

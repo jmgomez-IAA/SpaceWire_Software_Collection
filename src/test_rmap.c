@@ -50,6 +50,110 @@
 #define _ADDRESS_PATH 2
 #define _ADDRESS_PATH_SIZE 1
 
+
+/* 
+  Flags and variables requiered to manage
+  the input parammeteres 
+*/
+static int verbose_flag;
+static int reset_flag;
+static int identify_flag;
+static int address_flag;
+static int data_flag;
+static int timeout_flag;
+
+static unsigned int verbose_level;
+static unsigned int address_to_write;
+static unsigned int data_to_write;
+static unsigned int op_timeout;
+static unsigned int output_format;
+
+
+int parse_parammeters (int paramc, char *const *paramv)
+{
+  int opt;
+
+  if (paramc == 1)
+  {
+    fprintf (stderr,"One argument expected.\n");
+    fprintf (stderr,"Sixtax: %s\n -a address -t timeout -v\n", paramv[0]);
+    fprintf (stderr,"Write a register from the device with and rmap read command.\n");
+    fprintf (stderr,"\t-a address\t address in hexadecimal to write.\n");
+    fprintf (stderr,"\t-d data\t address in hexadecimal to write.\n");
+    fprintf (stderr,"\t-t timeout\t milliseconds to wait for the reception of the reply.\n");
+    fprintf (stderr,"\t-v\t\t verbose mode.");
+    fprintf (stderr,"\n\n");
+    return -1;
+  }
+
+  while ((opt = getopt (paramc, paramv, "via:d:t:o:")) != -1)
+  {
+    switch (opt)
+    {
+      case 'v':  //verbose mode
+        verbose_flag = 1;
+        verbose_level = 1;
+        if (verbose_flag == 1) fprintf (stderr,"Verbose mode enabled\n");
+        break;
+
+      case 'i':  //verbose mode
+        identify_flag = 1;        
+        if (verbose_flag == 1) fprintf (stderr,"Indentify device enabled\n");
+        break;
+
+      case 'r':  //verbose mode
+        reset_flag = 1;        
+        if (verbose_flag == 1)  fprintf (stderr,"Reset device enabled %s\n", optarg);
+        break;
+
+      case 'd':
+        data_flag = 1;
+        unsigned long param_data = strtoul(optarg, NULL, 16);
+        data_to_write = (unsigned int) param_data;
+        if (verbose_flag == 1) fprintf (stderr,"The argument supplied is %u\n", data_to_write);
+        break;
+
+      case 'a':  //address supplied
+        address_flag = 1;        
+        unsigned long param_addr = strtoul(optarg, NULL, 16);
+        address_to_write = (unsigned int) param_addr;
+        if (verbose_flag == 1) fprintf (stderr,"The argument supplied is %u\n", address_to_write);
+        break;
+
+      case 't': //Time-out
+        timeout_flag = 1;        
+        unsigned long param_timeout = strtoul(optarg, NULL, 10);
+        op_timeout = (unsigned int) param_timeout;
+        if (verbose_flag == 1) fprintf (stderr,"The argument supplied is %u\n", op_timeout);
+        break;
+
+      case '?':
+        if ( (optopt == 'a') || (optopt == 't') )
+          fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+        else if (isprint (optopt))
+          fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+        else
+          fprintf (stderr,
+                   "Unknown option character `\\x%x'.\n",
+                   optopt);
+        return 1;
+
+      default:
+        fprintf (stderr, "One argument expected.\n");
+        return 1;
+    }
+  }
+
+  for(; optind < paramc; optind++)
+  {
+    fprintf(stderr, "extra arguments: %s\n", paramv[optind]);
+    return optind;
+  } 
+
+  return opt;
+}
+
+
 /******************************************************************/
 /*                                                                */
 /*****************************************************************/
@@ -71,6 +175,32 @@ int __cdecl main(int argc, char *argv[]){
   /**
    * Parse arguments.
   */
+  verbose_flag    = 0;
+  address_flag    = 0;
+  data_flag       = 0;
+  timeout_flag    = 0;
+  identify_flag   = 0;
+  reset_flag      = 0;
+
+  // Parse parammeteres
+  if ( parse_parammeters (argc, argv) != -1){
+    fprintf (stderr, "There are unkown parammeters,please check!!\n");
+    return -1;
+  }
+
+  if (address_flag == 0 || data_flag == 0)
+  {
+    fprintf (stderr, "The address and data to write from the target device are required.\n");
+    return -1;
+  }
+
+  if (timeout_flag == 0)
+  {
+    fprintf (stderr, "Timeout for the reply reception to maximum.\n");
+    op_timeout = STAR_INFINITE;
+  }
+
+
 
   /***************************************************************/
   /*        Configuration                                        */
@@ -134,7 +264,7 @@ int __cdecl main(int argc, char *argv[]){
   }
 
   /* Open channel 1 for Transmit*/
-  txChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_OUT,
+  txChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_INOUT,
 					      txChannelNumber, TRUE);
   if (txChannelNumber == 0U)
     {
@@ -163,9 +293,18 @@ int __cdecl main(int argc, char *argv[]){
   unsigned long buildPacketLen;
   U8 pTarget[] = {0,254};
   U8 pReply[] = {254};
-  U8 pData[] = {0x00, 0x14, 0x02, 0x2E};
+  U8 pData[4];
   char status;
 
+
+  //memcpy(pData, (U8*) data_to_write, 4);
+
+
+
+  pData[0] = (data_to_write & 0xFF000000) >> 24;
+  pData[1] = (data_to_write & 0x00FF0000) >> 16;
+  pData[2] = (data_to_write & 0x0000FF00) >> 8;
+  pData[3] = data_to_write & 0x000000FF;
   byteSize = _PACKET_SIZE;
   
   /* Calculate the length of a 
@@ -186,8 +325,8 @@ int __cdecl main(int argc, char *argv[]){
     }
 
   /* Fill the memory with the packet */  
-  status = RMAP_FillWriteCommandPacket(pTarget, 2, pReply, 1, 1, 0, 0, 0x00,
-				       0, 0x820, 0, pData, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
+  status = RMAP_FillWriteCommandPacket(pTarget, 2, pReply, 1, 1, 1, 0, 0x00,
+				       0, address_to_write, 0, pData, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 				       fillPacketLenCalculated);
   if (!status)
     {
@@ -230,12 +369,6 @@ int __cdecl main(int argc, char *argv[]){
   /***************************************************************/
 
   /* Submit the receive operation */
-  if (STAR_submitTransferOperation(rxChannelId, pRxTransferOp) == 0)
-    {
-      printf("\nERROR occurred during receive.  Test Tfailed.\n");
-      return 0;
-    }
-
   /* Submit the transmit operation */
   if (STAR_submitTransferOperation(txChannelId, pTxTransferOp) == 0)
     {
@@ -248,21 +381,111 @@ int __cdecl main(int argc, char *argv[]){
 
   /* Wait on the transmit operation completing */
   txStatus = STAR_waitOnTransferOperationCompletion(pTxTransferOp,
-						    STAR_INFINITE);
+						    op_timeout);
   if(txStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
       printf("\nERROR occurred during transmit.  Test failed.\n");
       return 0;
     }
 
+if (STAR_submitTransferOperation(txChannelId, pRxTransferOp) == 0)
+    {
+      printf("\nERROR occurred during receive.  Test Tfailed.\n");
+      return 0;
+    }
+
   /* Wait on the receive operation completing */
   rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
-						    STAR_INFINITE);
+						    op_timeout);
   if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
       printf("\nERROR occurred during receive.  Test failed.\n");
       return 0;
     }
+
+  /****************************************************************/
+  /*    Parse the response                                        */
+  /*                                                              */
+  /****************************************************************/
+  unsigned long register_data_value = 0;
+  unsigned long packet_iterator;
+  unsigned int rxPacketCount;
+  STAR_STREAM_ITEM *pRxStreamItem;
+  STAR_TRANSFER_OPERATION * pTransferOp;
+  unsigned char* pRxStreamData;
+  unsigned int pRxStreamDataSize = 0;
+
+  unsigned char* rply_data;
+  unsigned int rply_data_length;
+
+  RMAP_PACKET packetStruct;
+  RMAP_STATUS conv_status;
+  RMAP_STATUS rply_status;
+
+  /* Get the number of traffic items received */
+  rxPacketCount = STAR_getTransferItemCount((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
+  
+  if (rxPacketCount != 0)
+  {
+    // Search for the reply packet.
+      for (packet_iterator = 0U; packet_iterator < rxPacketCount; packet_iterator++)
+      {
+        /* Get the packet */
+        pRxStreamItem = STAR_getTransferItem((STAR_TRANSFER_OPERATION *)  pRxTransferOp,
+                                             packet_iterator);
+
+        if ( pRxStreamItem->itemType == STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) 
+        {
+          
+          if (verbose_flag == 1) dumpPacket( (STAR_SPACEWIRE_PACKET *) pRxStreamItem->item);
+          // Get Data   
+          pRxStreamDataSize = 0;          
+          pRxStreamData = STAR_getPacketData( (STAR_SPACEWIRE_PACKET *) pRxStreamItem->item,
+                                                &pRxStreamDataSize);
+
+          // Check packet structure and update it on the packetStruct variable. The data is dependant of the
+          // memory of  pRxStreamData.
+          conv_status = RMAP_CheckPacketValid   (   (void *) pRxStreamData,
+                                                    pRxStreamDataSize,
+                                                    &packetStruct,
+                                                    1 );                              
+
+          if (conv_status == RMAP_SUCCESS) {
+            rply_status = RMAP_GetStatus( &packetStruct);
+            RMAP_PACKET_TYPE type = RMAP_GetPacketType(&packetStruct);
+
+            if (verbose_level == 1)
+            {            
+              display_packet_type(type);
+              display_packet_status(rply_status);
+            }
+
+            if (rply_status == RMAP_SUCCESS)
+            {
+              U16 transactionid = RMAP_GetTransactionID( &packetStruct);              
+              fprintf(stdout, "{\"%d\" : Success}\n", transactionid);              
+            }
+            else
+            {
+              fprintf(stderr, "STAR: The RMAP packet received with error code %d.\n", rply_status);
+            }            
+          }
+          else
+          {
+            fprintf(stderr, "STAR: The packet is %sa valid RMAP packet.\n", (conv_status == RMAP_SUCCESS) ? "" : "not ");            
+          }
+
+          STAR_destroyPacketData(pRxStreamData);          
+        }
+        else{
+          fprintf(stderr, "STAR: skip packet %d.\n", packet_iterator);     
+        }
+      }
+  }
+  else
+  {
+    fprintf(stderr, "STAR: No reply received.\n");
+  }
 
   /****************************************************************/
   /*    Free the resource                                         */

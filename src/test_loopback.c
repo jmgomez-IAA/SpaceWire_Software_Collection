@@ -33,80 +33,6 @@
 
 #define STAR_INFINITE 30000
 
-void printPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket){
-    unsigned char* pTxStreamData = NULL;
-    STAR_SPACEWIRE_ADDRESS *pStreamItemAddress = NULL;
-    unsigned int pTxStreamDataSize = 0, i;
-    pTxStreamData = STAR_getPacketData(
-                    (STAR_SPACEWIRE_PACKET *)StreamItemPacket,
-                    &pTxStreamDataSize);	
-
-    pStreamItemAddress =  STAR_getPacketAddress ( (STAR_SPACEWIRE_PACKET *)StreamItemPacket);
-/*
-    printf("Packet  Address Path [Size: %d]\n", pStreamItemAddress->pathLength);
-    printf("===================\n");
-    for(i=0; i < pStreamItemAddress->pathLength ; ++i){
-    	printf( "\t0x%x" ,pStreamItemAddress->pPath[i]);
-	if (!((i+1) % 8 ) ){
-	    printf("\n");
-	}
-    }
-*/
-	    printf("\n");
-
-    printf("Packet  Data\n");
-    printf("===================\n");
-    for ( i= 0; i < pTxStreamDataSize; ++i){
-    	printf( "\t0x%x" ,pTxStreamData[i]);
-	if (!((i+1) % 8 ) ){
-	    printf("\n");
-	}
-    }
-
-    STAR_destroyAddress(pStreamItemAddress);
-    STAR_destroyPacketData(pTxStreamData);
-}
-
-
-unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp)
-{
-  unsigned long i;
-  unsigned int rxPacketCount;
-  STAR_STREAM_ITEM *pRxStreamItem;
-
-  /* Get the number of traffic items received */
-  rxPacketCount = STAR_getTransferItemCount(pTransferOp);
-  if (rxPacketCount == 0)
-    {
-      printf("No packets received.\n");
-    }
-  else
-    {
-      /* For each traffic item received */
-      for (i = 0U; i < rxPacketCount; i++)
-        {
-	  /* Get the packet */
-	  pRxStreamItem = STAR_getTransferItem(pTransferOp, i);
-	  if ((pRxStreamItem == NULL) || (pRxStreamItem->itemType !=
-					  STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) ||
-	      (pRxStreamItem->item == NULL))
-            {
-	      printf("\nERROR received an unexpected traffic type, or empty traffic item in item %lu\n",
-		     i);
-            }
-	  else
-            {
-	      printPacket( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
-            }
-        }
-    }
-
-  /* Return the error count */
-  return rxPacketCount;
-}
-
-
-
 unsigned long comparePackets(STAR_TRANSFER_OPERATION * const pTransferOp,
     const unsigned long packetCount, const unsigned long packetSize,
     char * const pBuffer)
@@ -337,7 +263,7 @@ int __cdecl main(int argc, char *argv[]){
     }
 
   /* Print the Packet. Diabled for Packets bigger thant 64B */
-  printPacket((STAR_SPACEWIRE_PACKET *)pTxStreamItem->item);
+  dumpPacket((STAR_SPACEWIRE_PACKET *)pTxStreamItem->item);
 
   /* Create the transmit transfer operation for the packet */
   pTxTransferOp = STAR_createTxOperation(&pTxStreamItem, 1U);

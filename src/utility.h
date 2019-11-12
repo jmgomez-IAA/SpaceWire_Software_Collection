@@ -19,6 +19,7 @@
 
 #include <time.h>
 #include "star-api.h"
+#include "rmap_packet_library.h"
 
 #ifndef UTILITYFILE_H
 #define UTILITYFILE_H
@@ -47,7 +48,40 @@
 #endif
 
 
+/**
+ * @brief Prints a SpaceWire RMAP Reply address
+*/
 
+typedef struct rmap_reply_header_t
+{
+  unsigned char  init_address;          //  Byte 1
+  unsigned char  protocol_id;           //  Byte 2
+  unsigned char  instruction_field;     //  Byte 3
+  unsigned char  cmd_status;            //  Byte 4
+  unsigned char  target_addr;           //  Byte 5
+  unsigned short  tans_ident;           //  Byte 6-7
+  unsigned char  reserved_1;           //  Byte 8
+  unsigned int  data_length;           //  Byte 9,10,11
+  unsigned char  header_crc;             //  Byte 12
+}rmap_reply_header_t;
+
+
+typedef struct rmap_reply_data_t
+{
+  unsigned int data_length;
+  unsigned char *data_chunk;
+  unsigned char data_crc;
+}rmap_reply_data_t;
+
+#define HEADER_OFFSET 0
+#define RPLY_PACKET_DATA_OFFSET 12
+
+unsigned int reverse_4bytes_array(unsigned int lsb_integer);
+void display_packet_type(RMAP_PACKET_TYPE type);
+void display_packet_status(RMAP_STATUS status);
+void dumpPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket);
+unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp);
+void printReply(STAR_SPACEWIRE_PACKET * StreamItemPacket);
 unsigned int random32(void);
 unsigned int random16(void);
 

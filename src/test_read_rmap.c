@@ -1,18 +1,32 @@
 /*
   @file test_read_rmap.c
   @author Juan Manuel Gómez
-  @brief Demostration RMAP packet to configure GR718 
+  @brief Transmit a RMAP Read command to read a 4 Bytes register from target. 
   @details Demostrates how to configure GR718B using RMAP packets. The   
   configuration port is at SpaceWire Addr 0 and support RMAP
   target packet. The Register are memory mapped, and could be
   initalized through RMAP Write commands.
-  @param No parammeters needed.
-  @example ./test_rmap  
+  @param address
+  @param timeout
+  @param verbose
+
+  
+  @comments
+   More arguments: 
+     - Target address path
+     - target logical address
+     - initiator address paths 
+     - initiator logical address   
+     - transactio identifier
+    
+  @example ./test_rmap  -a 0xA40 -t 30 -v
   @copyright jmgomez CSIC-IAA
 */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "utility.h"
 #include "star-dundee_types.h"
 #include "star-api.h"
@@ -41,168 +55,102 @@
 #define _ADDRESS_PATH_SIZE 1
 
 
-/**
-* Process the receive message and outputs
+/* 
+  Flags and variables requiered to manage
+  the input parammeteres 
 */
-void dumpPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket){
-    unsigned char* pTxStreamData = NULL;
-    STAR_SPACEWIRE_ADDRESS *pStreamItemAddress = NULL;
-    unsigned int pTxStreamDataSize = 0, i;
-    pTxStreamData = STAR_getPacketData(
-                    (STAR_SPACEWIRE_PACKET *)StreamItemPacket,
-                    &pTxStreamDataSize);	
+static int verbose_flag;
+static int reset_flag;
+static int identify_flag;
+static int address_flag;
+static int timeout_flag;
+static int output_flag;
 
-    pStreamItemAddress =  STAR_getPacketAddress ( (STAR_SPACEWIRE_PACKET *)StreamItemPacket);
-	    printf("\n");
-
-    printf("Packet  Data\n");
-    printf("===================\n");
-    for ( i= 0; i < pTxStreamDataSize; ++i){
-    	printf( "\t0x%x" , pTxStreamData[i]);
-	if (!((i+1) % 8 ) ){
-	    printf("\n");
-	}
-    }
-
-    STAR_destroyAddress(pStreamItemAddress);
-    STAR_destroyPacketData(pTxStreamData);
-}
+static unsigned int verbose_level;
+static unsigned int address_to_read;
+static unsigned int op_timeout;
+static unsigned int output_format;
 
 
-/**
- * @brief Prints a SpaceWire RMAP Reply address
-*/
-
-typedef struct rmap_reply_header_t
+int parse_parammeters (int paramc, char *const *paramv)
 {
-  unsigned char  init_address;          //  Byte 1
-  unsigned char  protocol_id;           //  Byte 2
-  unsigned char  instruction_field;     //  Byte 3
-  unsigned char  cmd_status;            //  Byte 4
-  unsigned char  target_addr;           //  Byte 5
-  unsigned short  tans_ident;           //  Byte 6-7
-  unsigned char  reserved_1;           //  Byte 8
-  unsigned int  data_length;           //  Byte 9,10,11
-  unsigned char  header_crc;             //  Byte 12
-}rmap_reply_header_t;
+  int opt;
 
+  if (paramc == 1)
+  {
+    fprintf (stderr,"One argument expected.\n");
+    fprintf (stderr,"Sixtax: %s\n -a address -t timeout -v\n", paramv[0]);
+    fprintf (stderr,"Reads a register from the device with and rmap read command.\n");
+    fprintf (stderr,"\t-a address\t address in hexadecimal to read.\n");
+    fprintf (stderr,"\t-t timeout\t milliseconds to wait for the reception of the reply.\n");
+    fprintf (stderr,"\t-v\t\t verbose mode.");
+    fprintf (stderr,"\n\n");
+    return -1;
+  }
 
-typedef struct rmap_reply_data_t
-{
-  unsigned int data_length;
-  unsigned char *data_chunk;
-  unsigned char data_crc;
-}rmap_reply_data_t;
-
-#define HEADER_OFFSET 0
-#define RPLY_PACKET_DATA_OFFSET 12
-
-void printReply(STAR_SPACEWIRE_PACKET * StreamItemPacket)
-{
-
-    rmap_reply_header_t rply_header;
-    rmap_reply_data_t rply_data;
-    unsigned char* pTxStreamData = NULL;
-    STAR_SPACEWIRE_ADDRESS *pStreamItemAddress = NULL;
-    unsigned int pTxStreamDataSize = 0, i;
-
-    // Get the Data of the packet
-    pTxStreamData = STAR_getPacketData(
-                    (STAR_SPACEWIRE_PACKET *)StreamItemPacket,
-                    &pTxStreamDataSize);  
-
-    pStreamItemAddress =  STAR_getPacketAddress ( (STAR_SPACEWIRE_PACKET *)StreamItemPacket);
-
-    rply_header.init_address        = pTxStreamData[0];
-    rply_header.protocol_id         = pTxStreamData[1];           //  Byte 2
-    rply_header.instruction_field   = pTxStreamData[2];     //  Byte 3
-    rply_header.cmd_status          = pTxStreamData[3];            //  Byte 4
-    rply_header.target_addr         = pTxStreamData[4];           //  Byte 5
-    rply_header.tans_ident          = pTxStreamData[5]<<8 | pTxStreamData[6];           //  Byte 6-7
-    rply_header.reserved_1          = pTxStreamData[7];           //  Byte 8
-    rply_header.data_length         = pTxStreamData[8]<<16 | pTxStreamData[9]<<8 | pTxStreamData[10];           //  Byte 9,10,11
-    rply_header.header_crc          = pTxStreamData[11];             //  Byte 12
-
-    rply_data.data_length = rply_header.data_length;
-    rply_data.data_chunk = malloc (rply_data.data_length );
-    if (rply_data.data_chunk != NULL)
+  while ((opt = getopt (paramc, paramv, "via:t:o:")) != -1)
+  {
+    switch (opt)
     {
-      memcpy(rply_data.data_chunk, pTxStreamData+RPLY_PACKET_DATA_OFFSET, rply_data.data_length);
+      case 'v':  //verbose mode
+        verbose_flag = 1;
+        verbose_level = 1;
+        if (verbose_flag == 1) fprintf (stderr,"Verbose mode enabled\n");
+        break;
 
-      printf("\n");
-      printf(" RAMP REPLY PACKET \n");
-      printf("===================\n");
-      printf("\nFirst byte transmitted.\nReply SpW Address\n .... ");
-      printf("\nByte\t| Description\t\t\t| Value");
-      printf("\n0\t| Reply SpW Address\t\t| ");
-      printf("\n1\t| Initiator Logical Address\t| 0x%02X", rply_header.init_address);
-      printf("\n2\t| Protocol Identifier\t\t| 0x%02X", rply_header.protocol_id);
-      printf("\n3\t| Instruction\t\t\t| 0x%02X" , rply_header.instruction_field);
-      printf("\n4\t| Status\t\t\t| 0x%02X", rply_header.cmd_status);
-      printf("\n5\t| Target Logical Address\t| 0x%02X", rply_header.target_addr);
-      printf("\n6-7\t| Transaction Identifier \t| 0x%04X", rply_header.tans_ident);
-      printf("\n8\t| Reserved = 0\t\t\t| 0x%02X", rply_header.reserved_1);
-      printf("\n9-11\t| Data Length\t\t\t| 0x%06X", rply_header.data_length);
-      printf("\n12\t| Header CRC\t\t\t| 0x%02X", rply_header.header_crc);
+      case 'i':  //verbose mode
+        identify_flag = 1;        
+        if (verbose_flag == 1) fprintf (stderr,"Indentify device enabled\n");
+        break;
 
-      printf("\n Data\n");
+      case 'r':  //verbose mode
+        reset_flag = 1;        
+        if (verbose_flag == 1)  fprintf (stderr,"Reset device enabled %s\n", optarg);
+        break;
 
-      for( i = 0; i < rply_data.data_length; ++i)
-      {
-        rply_data.data_chunk[i];
-        printf( "\t0x%02X" , rply_data.data_chunk[i]);
+      case 'o':
+        output_flag = 1;
+        if (verbose_flag == 1) fprintf (stderr,"Output format selected as %s\n", optarg);
+        break;
 
-        if (!((i+1) % 8 ) )
-        {
-          printf("\n");
-        }        
-      }
+      case 'a':  //address supplied
+        address_flag = 1;        
+        unsigned long param_addr = strtoul(optarg, NULL, 16);
+        address_to_read = (unsigned int) param_addr;
+        if (verbose_flag == 1) fprintf (stderr,"The argument supplied is %u\n", address_to_read);
+        break;
 
-      printf("\n..................\n");
+      case 't': //Time-out
+        timeout_flag = 1;        
+        unsigned long param_timeout = strtoul(optarg, NULL, 10);
+        op_timeout = (unsigned int) param_timeout;
+        if (verbose_flag == 1) fprintf (stderr,"The argument supplied is %u\n", op_timeout);
+        break;
+
+      case '?':
+        if ( (optopt == 'a') || (optopt == 't') )
+          fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+        else if (isprint (optopt))
+          fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+        else
+          fprintf (stderr,
+                   "Unknown option character `\\x%x'.\n",
+                   optopt);
+        return 1;
+
+      default:
+        fprintf (stderr, "One argument expected.\n");
+        return 1;
     }
-    
-    free(rply_data.data_chunk);
+  }
 
-    STAR_destroyAddress(pStreamItemAddress);
-    STAR_destroyPacketData(pTxStreamData);
-}
+  for(; optind < paramc; optind++)
+  {
+    fprintf(stderr, "extra arguments: %s\n", paramv[optind]);
+    return optind;
+  } 
 
-unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp)
-{
-  unsigned long i;
-  unsigned int rxPacketCount;
-  STAR_STREAM_ITEM *pRxStreamItem;
-
-  /* Get the number of traffic items received */
-  rxPacketCount = STAR_getTransferItemCount(pTransferOp);
-  if (rxPacketCount == 0)
-    {
-      printf("No packets received.\n");
-    }
-  else
-    {
-      /* For each traffic item received */
-      for (i = 0U; i < rxPacketCount; i++)
-        {
-	  /* Get the packet */
-	  pRxStreamItem = STAR_getTransferItem(pTransferOp, i);
-	  if ((pRxStreamItem == NULL) || (pRxStreamItem->itemType !=
-					  STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) ||
-	      (pRxStreamItem->item == NULL))
-            {
-	      printf("\nERROR received an unexpected traffic type, or empty traffic item in item %lu\n",
-		     i);
-            }
-	  else
-            {
-	      printReply( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
-        //dumpPacket( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
-            }
-        }
-    }
-
-  /* Return the error count */
-  return rxPacketCount;
+  return opt;
 }
 
 
@@ -210,10 +158,12 @@ unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp)
 /*                                                                */
 /*****************************************************************/
 int __cdecl main(int argc, char *argv[]){
+  int opt;
 
   STAR_DEVICE_ID* devices;
   STAR_DEVICE_ID deviceId;
   U32 deviceCount = 0U, i;
+  
 
   STAR_CHANNEL_MASK channelMask;
   STAR_CFG_MK2_HARDWARE_INFO hardwareInfo;
@@ -224,22 +174,31 @@ int __cdecl main(int argc, char *argv[]){
   STAR_CHANNEL_ID rxChannelId = 0U, txChannelId = 0U;
   STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams;
 
-  unsigned int address_to_read = 0xA40;
+  verbose_flag    = 0;
+  address_flag    = 0;
+  timeout_flag    = 0;
+  identify_flag   = 0;
+  reset_flag      = 0;
 
-  if( argc == 2 ) {
-      char *terminatedAt;
-      printf("The argument supplied is %s\n", argv[1]);
-      unsigned long param_addr = strtoul(argv[1], &terminatedAt, 16);
-      address_to_read = (unsigned int) param_addr;
-      printf("The argument supplied is %u\n", address_to_read);
-   }
-   else if( argc > 2 ) {
-      printf("Too many arguments supplied.\n");
-   }
-   else {
-      printf("One argument expected.\n");
-   }
-  
+  // Parse parammeteres
+  if ( parse_parammeters (argc, argv) != -1){
+    fprintf (stderr, "There are unkown parammeters,please check!!\n");
+    return -1;
+  }
+
+  if (address_flag == 0)
+  {
+    fprintf (stderr, "The address to read from the target device is required.\n");
+    return -1;
+  }
+
+  if (timeout_flag == 0)
+  {
+    fprintf (stderr, "Timeout for the reply reception to maximum.\n");
+    op_timeout = STAR_INFINITE;
+  }
+
+
   /***************************************************************/
   /*        Configuration                                        */
   /*                                                             */
@@ -257,14 +216,14 @@ int __cdecl main(int argc, char *argv[]){
   /* Get the list of devices of the specified type */
   devices = STAR_getDeviceListForType(STAR_DEVICE_TXRX_SUPPORTED , &deviceCount);
   if (devices == NULL){
-    puts("No device found\n");	
+    fprintf (stderr, "STAR: No device found\n");	
     return 0;
   } 
 
   /* We are working with the first device, what if I have more? */
   deviceId = devices[0];	
   if (deviceId == STAR_DEVICE_UNKNOWN){
-    puts("Error dispositivo desconocido.\n");
+    fprintf (stderr, "STAR: Error dispositivo desconocido.\n");
     return 0;
   }
 
@@ -272,33 +231,39 @@ int __cdecl main(int argc, char *argv[]){
   CFG_MK2_getHardwareInfo(deviceId, &hardwareInfo);
   CFG_MK2_hardwareInfoToString(hardwareInfo, versionStr, buildDateStr);
   /* Display the hardware info*/
-  printf("\nVersion: %s", versionStr);
-  printf("\nBuildDate: %s", buildDateStr);	
+  if (verbose_level == 1)
+  {
+    printf("\nVersion: %s", versionStr);
+    printf("\nBuildDate: %s", buildDateStr);	    
+  }
   // Flashes the LEDS.
-  if (CFG_MK2_identify(deviceId) == 0)
-    {
-      puts("\nERROR: Unable to identify device");
-      return 0U;
-    }
+  if (identify_flag == 1)
+  {
+    if (CFG_MK2_identify(deviceId) == 0)
+      {
+        fprintf (stderr, "STAR: Unable to identify device.\n");
+        return 0U;
+      }
+  }
 
   /* Get the channels present on the device  */
   /* We need at least 2 Channels (0x00000007) */
   channelMask = STAR_getDeviceChannels(deviceId);
   if (channelMask != 7U)
     {
-      puts("The device does not have channel 1 and 2 available.\n");
+      fprintf (stderr, "STAR: The device does not have channel 1 and 2 available.\n");
       return 0U;
     }
 
   int status_link = 0;
   status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, txChannelNumber, clockRateParams);	
   if (status_link == 0){
-    puts("Error setting the Tx link speed.\n");	
+    fprintf (stderr, "STAR: Error setting the Tx link speed.\n");	
   }
 
   status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, rxChannelNumber, clockRateParams );
   if (status_link == 0){
-    puts("Error setting the RX link speed.\n");	
+    fprintf (stderr, "STAR: Error setting the RX link speed.\n");	
   }
 
   /* Open channel 1 for Transmit and receive*/
@@ -306,7 +271,7 @@ int __cdecl main(int argc, char *argv[]){
 					      txChannelNumber, TRUE);
   if (txChannelNumber == 0U)
     {
-      puts("\nERROR: Unable to open TX channel 1\n");
+      fprintf (stderr, "STAR: Unable to open TX channel 1\n");
       return 0;
     }
 
@@ -315,11 +280,11 @@ int __cdecl main(int argc, char *argv[]){
 					      rxChannelNumber, TRUE);
   if (rxChannelId == 0U)
     {
-      puts("\nERROR: Unable to open RX channel 2\n");
+      fprintf (stderr, "STAR: Unable to open RX channel 2\n");
       return 0;
     }
 
-  puts("Channels Opened.\n");	
+  if (verbose_flag == 1) fprintf (stderr, "STAR: Channels Opened.\n");	
 	
   /*****************************************************************/
   /*    Allocate memory for the transmit buffer and construct      */
@@ -337,33 +302,35 @@ int __cdecl main(int argc, char *argv[]){
 
   byteSize = _PACKET_SIZE;
 
-				       
   /*
     Calculate the length of a rmap read command packet
     with 4 bytes of data 
     */
   fillPacketLenCalculated = RMAP_CalculateReadCommandPacketLength(2, 1,1);
-  printf("The Read command packet will have a length of %ld bytes\n", 
+  if (verbose_flag == 1) 
+  {
+      fprintf (stderr, "STAR: The Read command packet will have a length of %ld bytes\n", 
           fillPacketLenCalculated);
+  }
 
   /* Allocate memory for the packet */
   pFillPacket = malloc(fillPacketLenCalculated);
   if (!pFillPacket)
     {
-      puts("Couldn't allocate the memory for the command packet");
+      fprintf (stderr, "STAR: Couldn't allocate the memory for the command packet\n");
       return;
-    }
+    }    
 
   status = RMAP_FillReadCommandPacket(pTarget, 2, pReply, 1, 0, 0x00,
 				      0, address_to_read, 0, 4, &fillPacketLen, NULL, 1, (U8 *)pFillPacket,
 				       fillPacketLenCalculated);
   if (!status)
     {
-      puts("Couldn't fill the write command packet");
+      fprintf (stderr, "STAR: Couldn't fill the write command packet\n");
       free(pFillPacket);
       return;
     }
-  
+
   STAR_TRANSFER_OPERATION *pTxTransferOp = NULL, *pRxTransferOp = NULL;
   STAR_STREAM_ITEM *pTxStreamItem = NULL;
    
@@ -371,7 +338,7 @@ int __cdecl main(int argc, char *argv[]){
   pRxTransferOp = STAR_createRxOperation(1, STAR_RECEIVE_PACKETS);
   if (pRxTransferOp == NULL)
     {
-      puts("\nERROR: Unable to create receive operation");
+      fprintf (stderr, "STAR: Unable to create receive operation\n");
       return 0;
     }
 
@@ -380,7 +347,7 @@ int __cdecl main(int argc, char *argv[]){
 
   if (pTxStreamItem == NULL)
     {
-      puts("\nERROR: Unable to create the packet to be transmitted");
+      fprintf (stderr, "STAR: Unable to create the packet to be transmitted\n");
       return 0;
     }
 
@@ -388,7 +355,7 @@ int __cdecl main(int argc, char *argv[]){
   pTxTransferOp = STAR_createTxOperation(&pTxStreamItem, 1U);
   if (pTxTransferOp == NULL)
     {
-      puts("\nERROR: Unable to create the transfer operation to be transmitted");
+      fprintf (stderr, "STAR: Unable to create the transfer operation to be transmitted\n");
       return 0;
     }
 
@@ -400,7 +367,7 @@ int __cdecl main(int argc, char *argv[]){
   /* Submit the transmit operation */
   if (STAR_submitTransferOperation(txChannelId, pTxTransferOp) == 0)
     {
-      printf("\nERROR occurred during transmit.  Test failed.\n");
+      fprintf (stderr, "STAR: ERROR occurred during transmit. \n\tTest failed.\n");
       return 0;
     }
 
@@ -409,33 +376,126 @@ int __cdecl main(int argc, char *argv[]){
 
   /* Wait on the transmit operation completing */
   txStatus = STAR_waitOnTransferOperationCompletion(pTxTransferOp,
-						    STAR_INFINITE);
+						    op_timeout);
   if(txStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
-      printf("\nERROR occurred during transmit.  Test failed.\n");
+      fprintf (stderr, "STAR: ERROR occurred during transmit.\n\tTest failed.\n");
       return 0;
     }
 
   /* Submit the receive operation */
   if (STAR_submitTransferOperation(txChannelId, pRxTransferOp) == 0)
     {
-      printf("\nERROR occurred during receive.  Test Tfailed.\n");
+      fprintf (stderr, "STAR: ERROR occurred during receive.\n\tTest failed.\n");
       return 0;
     }
 
   /* Wait on the receive operation completing */
   rxStatus = STAR_waitOnTransferOperationCompletion(pRxTransferOp,
-						    STAR_INFINITE);
+						    op_timeout);
 
   if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
-      printf("\nERROR occurred during receive.  Test failed.\n");
+      fprintf (stderr, "STAR: ERROR occurred during receive.\n\tTest failed.\n");
       return 0;
     }
 
     //Modify to parse the output.
-  printRxPackets((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
+    if (verbose_level == 1)
+    {      
+      printRxPackets((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
+    }
 
+  /****************************************************************/
+  /*    Process the command response                              */
+  /*                                                              */
+  /****************************************************************/
+  unsigned long register_data_value = 0;
+  unsigned long packet_iterator;
+  unsigned int rxPacketCount;
+  STAR_STREAM_ITEM *pRxStreamItem;
+  STAR_TRANSFER_OPERATION * pTransferOp;
+  unsigned char* pRxStreamData;
+  unsigned int pRxStreamDataSize = 0;
+
+  unsigned char* rply_data;
+  unsigned int rply_data_length;
+
+  RMAP_PACKET packetStruct;
+  RMAP_STATUS conv_status;
+  RMAP_STATUS rply_status;
+
+  /* Get the number of traffic items received */
+  rxPacketCount = STAR_getTransferItemCount((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
+  
+  if (rxPacketCount != 0)
+  {
+    // Search for the reply packet.
+      for (packet_iterator = 0U; packet_iterator < rxPacketCount; packet_iterator++)
+      {
+        /* Get the packet */
+        pRxStreamItem = STAR_getTransferItem((STAR_TRANSFER_OPERATION *)  pRxTransferOp,
+                                             packet_iterator);
+
+        if ( pRxStreamItem->itemType == STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) 
+        {
+          
+          if (verbose_flag == 1) dumpPacket( (STAR_SPACEWIRE_PACKET *) pRxStreamItem->item);
+          // Get Data   
+          pRxStreamDataSize = 0;          
+          pRxStreamData = STAR_getPacketData( (STAR_SPACEWIRE_PACKET *) pRxStreamItem->item,
+                                                &pRxStreamDataSize);
+
+          // Check packet structure and update it on the packetStruct variable. The data is dependant of the
+          // memory of  pRxStreamData.
+          conv_status = RMAP_CheckPacketValid   (   (void *) pRxStreamData,
+                                                    pRxStreamDataSize,
+                                                    &packetStruct,
+                                                    1 );                              
+
+          if (conv_status == RMAP_SUCCESS) {
+            rply_status = RMAP_GetStatus( &packetStruct);
+            RMAP_PACKET_TYPE type = RMAP_GetPacketType(&packetStruct);
+
+            if (verbose_level == 1)
+            {            
+              display_packet_type(type);
+              display_packet_status(rply_status);
+            }
+
+            if (rply_status == RMAP_SUCCESS)
+            {
+              rply_data = RMAP_GetData( &packetStruct, &rply_data_length);
+              
+              if ( rply_data_length == 4)
+              {
+                unsigned int register_receiv_value;
+                memcpy( &register_receiv_value, rply_data, 4);
+                register_data_value =  reverse_4bytes_array(register_receiv_value);
+                fprintf(stdout, "{\"0x%08x\" : 0x%08x}\n", address_to_read, register_data_value);
+              }
+            }
+            else
+            {
+              fprintf(stderr, "STAR: The RMAP packet received with error code %d.\n", rply_status);
+            }            
+          }
+          else
+          {
+            fprintf(stderr, "STAR: The packet is %sa valid RMAP packet.\n", (conv_status == RMAP_SUCCESS) ? "" : "not ");            
+          }
+
+          STAR_destroyPacketData(pRxStreamData);          
+        }
+        else{
+          fprintf(stderr, "STAR: skip packet %d.\n", packet_iterator);     
+        }
+      }
+  }
+  else
+  {
+    fprintf(stderr, "STAR: No reply received.\n");
+  }
 
   /****************************************************************/
   /*    Free the resource                                         */
@@ -470,8 +530,4 @@ int __cdecl main(int argc, char *argv[]){
 
   return 0;
 }
-
-
-
-
 
