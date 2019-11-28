@@ -33,6 +33,111 @@
 
 #define STAR_INFINITE 30000
 
+
+
+/* 
+  Flags and variables requiered to manage
+  the input parammeteres 
+*/
+static int verbose_flag;
+static int reset_flag;
+static int identify_flag;
+static int address_flag;
+static int size_flag;
+static int timeout_flag;
+
+static unsigned int verbose_level;
+static unsigned int address_to_write;
+static unsigned int packet_data_size;
+static unsigned int op_timeout;
+
+int parse_parammeters (int paramc, char *const *paramv)
+{
+  int opt;
+
+  if (paramc == 1)
+  {
+    fprintf (stderr,"One argument expected.\n");
+    fprintf (stderr,"Sixtax: %s\n-a targetAddress -b byteSize -p targetPath-t timeout -v\n", paramv[0]);
+    fprintf (stderr,"Write a register from the device with and rmap read command.\n");
+    fprintf (stderr,"\t-a targetAddress\t address in hexadecimal to write.\n");
+    fprintf (stderr,"\t-b dataSize\t packet data size n bytes.\n");
+    fprintf (stderr,"\t-p addressPath\t target address to path from the trnsmiter.\n");
+    fprintf (stderr,"\t-t timeout\t milliseconds to wait for the reception of the reply.\n");
+    fprintf (stderr,"\t-v\t\t verbose mode.");
+    fprintf (stderr,"\n\n");
+    return -1;
+  }
+
+  while ((opt = getopt (paramc, paramv, "vrib:a:p:t:")) != -1)
+  {
+    switch (opt)
+    {
+      case 'v':  //verbose mode
+        verbose_flag = 1;
+        verbose_level = 1;
+        if (verbose_flag == 1) fprintf (stderr,"Verbose mode enabled\n");
+        break;
+
+      case 'i':  //Identify flags
+        identify_flag = 1;        
+        if (verbose_flag == 1) fprintf (stderr,"Indentify device enabled\n");
+        break;
+
+      case 'r':  //reset device
+        reset_flag = 1;        
+        if (verbose_flag == 1)  fprintf (stderr,"Reset device enabled %s\n", optarg);
+        break;
+
+      case 'b':
+        size_flag = 1;
+        unsigned long param_data = strtoul(optarg, NULL, 10);
+        packet_data_size = (unsigned int) param_data;
+        if (verbose_flag == 1) fprintf (stderr,"The data size supplied is %d\n", packet_data_size);
+        break;
+
+      case 'a':  //address supplied
+        address_flag = 1;        
+        unsigned long param_addr = strtoul(optarg, NULL, 16);
+        address_to_write = (unsigned int) param_addr;
+        if (verbose_flag == 1) fprintf (stderr,"The target address supplied is %u\n", address_to_write);
+        break;
+
+      case 't': //Time-out
+        timeout_flag = 1;        
+        unsigned long param_timeout = strtoul(optarg, NULL, 10);
+        op_timeout = (unsigned int) param_timeout;
+        if (verbose_flag == 1) fprintf (stderr,"The argument supplied is %u\n", op_timeout);
+        break;
+
+      case '?':
+        if ( (optopt == 'a') || (optopt == 't') )
+          fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+        else if (isprint (optopt))
+          fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+        else
+          fprintf (stderr,
+                   "Unknown option character `\\x%x'.\n",
+                   optopt);
+        return 1;
+
+      default:
+        fprintf (stderr, "One argument expected.\n");
+        return 1;
+    }
+  }
+
+  for(; optind < paramc; optind++)
+  {
+    fprintf(stderr, "extra arguments: %s\n", paramv[optind]);
+    return optind;
+  } 
+
+  return opt;
+}
+
+
+
 unsigned long comparePackets(STAR_TRANSFER_OPERATION * const pTransferOp,
     const unsigned long packetCount, const unsigned long packetSize,
     char * const pBuffer)
@@ -107,7 +212,7 @@ unsigned long comparePackets(STAR_TRANSFER_OPERATION * const pTransferOp,
 #define _RX_BAUDRATE_MUL 2
 #define _RX_BAUDRATE_DIV 4
 
-#define _ADDRESS_PATH 1
+#define _ADDRESS_PATH 0xFE
 #define _ADDRESS_PATH_SIZE 1
 
 
@@ -130,6 +235,41 @@ int __cdecl main(int argc, char *argv[]){
   STAR_CFG_MK2_BASE_TRANSMIT_CLOCK clockRateParams;
 
 
+  verbose_flag    = 0;
+  address_flag    = 0;
+  size_flag       = 0;
+  timeout_flag    = 0;
+  identify_flag   = 0;
+  reset_flag      = 0;
+
+  verbose_level   = 0;
+  address_to_write = 0;
+  packet_data_size = 0;
+
+
+    // Parse parammeteres
+  if ( parse_parammeters (argc, argv) != -1){
+    fprintf (stderr, "There are unkown parammeters,please check!!\n");
+    return -1;
+  }
+
+  if (timeout_flag == 0)
+  {
+    fprintf (stderr, "Timeout for the reply reception to maximum.\n");
+    op_timeout = STAR_INFINITE;
+  }
+
+  if (size_flag == 0)
+  {
+    fprintf (stderr, "Packet size set to default %d bytes.\n", _PACKET_SIZE);
+    packet_data_size = _PACKET_SIZE;
+  }
+
+  if (address_flag == 0)
+  {
+    fprintf (stderr, "Target Address set to default 0xFE.\n" );
+    address_to_write = _ADDRESS_PATH;
+  }
 
 
   /***************************************************************/
@@ -150,14 +290,14 @@ int __cdecl main(int argc, char *argv[]){
   /* Get the list of devices of the specified type */
   devices = STAR_getDeviceListForType(STAR_DEVICE_TXRX_SUPPORTED , &deviceCount);
   if (devices == NULL){
-    puts("No device found\n");	
+    fprintf (stderr, "No device found\n");	
     return 0;
   } 
 
   /* We are working with the first device, what if I have more? */
   deviceId = devices[0];	
   if (deviceId == STAR_DEVICE_UNKNOWN){
-    puts("Error dispositivo desconocido.\n");
+    fprintf (stderr, "Error dispositivo desconocido.\n");
     return 0;
   }
 
@@ -165,12 +305,16 @@ int __cdecl main(int argc, char *argv[]){
   CFG_MK2_getHardwareInfo(deviceId, &hardwareInfo);
   CFG_MK2_hardwareInfoToString(hardwareInfo, versionStr, buildDateStr);
   /* Display the hardware info*/
-  printf("\nVersion: %s", versionStr);
-  printf("\nBuildDate: %s", buildDateStr);	
+
+  if (verbose_level == 1)
+  {
+    printf("\nVersion: %s", versionStr);
+    printf("\nBuildDate: %s", buildDateStr);	
+  }
   // Flashes the LEDS.
   if (CFG_MK2_identify(deviceId) == 0)
     {
-      puts("\nERROR: Unable to identify device");
+      fprintf (stderr, "\nERROR: Unable to identify device");
       return 0U;
     }
 
@@ -179,27 +323,27 @@ int __cdecl main(int argc, char *argv[]){
   channelMask = STAR_getDeviceChannels(deviceId);
   if (channelMask != 7U)
     {
-      puts("The device does not have channel 1 and 2 available.\n");
+      fprintf (stderr, "The device does not have channel 1 and 2 available.\n");
       return 0U;
     }
 
   int status_link = 0;
   status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, txChannelNumber, clockRateParams);	
   if (status_link == 0){
-    puts("Error setting the Tx link speed.\n");	
+    fprintf (stderr, "Error setting the Tx link speed.\n");	
   }
 
   status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, rxChannelNumber, clockRateParams );
   if (status_link == 0){
-    puts("Error setting the RX link speed.\n");	
+    fprintf (stderr, "Error setting the RX link speed.\n");	
   }
 
   /* Open channel 1 for Transmit*/
-  txChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_OUT,
+  txChannelId = STAR_openChannelToLocalDevice(deviceId, STAR_CHANNEL_DIRECTION_INOUT,
 					      txChannelNumber, TRUE);
   if (txChannelNumber == 0U)
     {
-      puts("\nERROR: Unable to open TX channel 1\n");
+      fprintf (stderr, "\nERROR: Unable to open TX channel 1\n");
       return 0;
     }
   /* Open channel 2 for Receipt*/
@@ -207,15 +351,19 @@ int __cdecl main(int argc, char *argv[]){
 					      rxChannelNumber, TRUE);
   if (rxChannelId == 0U)
     {
-      puts("\nERROR: Unable to open RX channel 2\n");
+      fprintf (stderr, "\nERROR: Unable to open RX channel 2\n");
       return 0;
     }
 
-  puts("Channels Opened.\n");	
-	
+  if (verbose_level == 1)
+    {
+      fprintf (stderr, "Channels Opened.\n");	
+    }	
   /*****************************************************************/
   /*    Allocate memory for the transmit buffer and construct      */
   /*    the packet to transmit.                                    */
+  /*    #define _ADDRESS_PATH 1                                    */
+  /*    #define _ADDRESS_PATH_SIZE 1                               */
   /*****************************************************************/
   unsigned long byteSize = 0;
   char *pTxBuffer = NULL;
@@ -225,20 +373,21 @@ int __cdecl main(int argc, char *argv[]){
   unsigned int pathLen = 0;
   STAR_SPACEWIRE_ADDRESS *pAddressPath = NULL;
 
-  byteSize = _PACKET_SIZE;
+  byteSize = packet_data_size;
   pathLen = _ADDRESS_PATH_SIZE;
-  newPath[0] = _ADDRESS_PATH;
+  newPath[0] = address_to_write;
   newPath[1] = 2;
 
   /* Allocate memory for the transmit buffer */
   pTxBuffer = (char *)calloc(1U, byteSize);
   if (pTxBuffer == NULL)
     {
-      puts("\nERROR: Unable to allocate memory for transmit buffer");
+      fprintf (stderr, "\nERROR: Unable to allocate memory for transmit buffer");
       return 0;
     }
   /*Initialize with data*/
-  for(i=0; i< byteSize; ++i){
+    pTxBuffer[0] = address_to_write;
+  for(i=1; i< byteSize; ++i){
     pTxBuffer[i] = i;
   }
 
@@ -249,27 +398,30 @@ int __cdecl main(int argc, char *argv[]){
   pRxTransferOp = STAR_createRxOperation(1, STAR_RECEIVE_PACKETS);
   if (pRxTransferOp == NULL)
     {
-      puts("\nERROR: Unable to create receive operation");
+      fprintf (stderr, "\nERROR: Unable to create receive operation");
       return 0;
     }
 
   /* Create the packet to be transmitted */
-  pTxStreamItem = STAR_createPacket(pAddressPath, (U8 *)pTxBuffer, byteSize,
+  pTxStreamItem = STAR_createPacket(NULL, (U8 *)pTxBuffer, byteSize,
 				    STAR_EOP_TYPE_EOP);
   if (pTxStreamItem == NULL)
     {
-      puts("\nERROR: Unable to create the packet to be transmitted");
+      fprintf (stderr, "\nERROR: Unable to create the packet to be transmitted");
       return 0;
     }
 
   /* Print the Packet. Diabled for Packets bigger thant 64B */
-  dumpPacket((STAR_SPACEWIRE_PACKET *)pTxStreamItem->item);
+  if (verbose_level == 1)
+    {
+      dumpPacket((STAR_SPACEWIRE_PACKET *)pTxStreamItem->item);
+    }
 
   /* Create the transmit transfer operation for the packet */
   pTxTransferOp = STAR_createTxOperation(&pTxStreamItem, 1U);
   if (pTxTransferOp == NULL)
     {
-      puts("\nERROR: Unable to create the transfer operation to be transmitted");
+      fprintf (stderr, "\nERROR: Unable to create the transfer operation to be transmitted");
       return 0;
     }
 
@@ -320,11 +472,24 @@ int __cdecl main(int argc, char *argv[]){
 
   //Compare the results
   int errorCount = 0;
+  int transactionid = 123;
   errorCount += comparePackets(pRxTransferOp, 1U, byteSize, pTxBuffer);
-  printf(" Error found in the communication: %i.\n", errorCount);
+  if (verbose_level == 1)
+    {      
+      printf(" Error found in the communication: %i.\n", errorCount);     
 
-  printRxPackets((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
+      dumpTransferOperation((STAR_TRANSFER_OPERATION *)  pRxTransferOp);
+      printf("\n");
 
+    }
+
+  if (errorCount == 0)
+    fprintf(stdout, "{\"%d\" : Success}\n", transactionid);
+  else
+    fprintf(stdout, "{\"%d\" : Fail, \"Error Count\": %d}\n", transactionid, errorCount);
+
+
+  
   /* Dispose of the transfer operations */
   if (pTxTransferOp != NULL)
     {

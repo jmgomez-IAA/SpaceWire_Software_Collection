@@ -219,14 +219,14 @@ int __cdecl main(int argc, char *argv[]){
   /* Get the list of devices of the specified type */
   devices = STAR_getDeviceListForType(STAR_DEVICE_TXRX_SUPPORTED , &deviceCount);
   if (devices == NULL){
-    puts("No device found\n");	
+    fprintf (stderr, "No device found\n");
     return 0;
   } 
 
   /* We are working with the first device, what if I have more? */
   deviceId = devices[0];	
   if (deviceId == STAR_DEVICE_UNKNOWN){
-    puts("Error dispositivo desconocido.\n");
+    fprintf (stderr, "Error dispositivo desconocido.\n");
     return 0;
   }
 
@@ -234,12 +234,16 @@ int __cdecl main(int argc, char *argv[]){
   CFG_MK2_getHardwareInfo(deviceId, &hardwareInfo);
   CFG_MK2_hardwareInfoToString(hardwareInfo, versionStr, buildDateStr);
   /* Display the hardware info*/
-  printf("\nVersion: %s", versionStr);
-  printf("\nBuildDate: %s", buildDateStr);	
+  if (verbose_level == 1)
+    {  
+      printf("Version: %s\n", versionStr);
+      printf("BuildDate: %s\n", buildDateStr);	
+    }
+
   // Flashes the LEDS.
   if (CFG_MK2_identify(deviceId) == 0)
     {
-      puts("\nERROR: Unable to identify device");
+      fprintf (stderr, "ERROR: Unable to identify device\n");
       return 0U;
     }
 
@@ -248,19 +252,19 @@ int __cdecl main(int argc, char *argv[]){
   channelMask = STAR_getDeviceChannels(deviceId);
   if (channelMask != 7U)
     {
-      puts("The device does not have channel 1 and 2 available.\n");
+      fprintf (stderr, "The device does not have channel 1 and 2 available.\n");
       return 0U;
     }
 
   int status_link = 0;
   status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, txChannelNumber, clockRateParams);	
   if (status_link == 0){
-    puts("Error setting the Tx link speed.\n");	
+    fprintf (stderr, "Error setting the Tx link speed.\n");	
   }
 
   status_link = CFG_BRICK_MK3_setBaseTransmitClock(deviceId, rxChannelNumber, clockRateParams );
   if (status_link == 0){
-    puts("Error setting the RX link speed.\n");	
+    fprintf (stderr, "Error setting the RX link speed.\n");	
   }
 
   /* Open channel 1 for Transmit*/
@@ -268,7 +272,7 @@ int __cdecl main(int argc, char *argv[]){
 					      txChannelNumber, TRUE);
   if (txChannelNumber == 0U)
     {
-      puts("\nERROR: Unable to open TX channel 1\n");
+      fprintf (stderr, "\nERROR: Unable to open TX channel 1\n");
       return 0;
     }
   /* Open channel 2 for Receipt*/
@@ -276,12 +280,14 @@ int __cdecl main(int argc, char *argv[]){
 					      rxChannelNumber, TRUE);
   if (rxChannelId == 0U)
     {
-      puts("\nERROR: Unable to open RX channel 2\n");
+      fprintf (stderr, "\nERROR: Unable to open RX channel 2\n");
       return 0;
     }
 
-  puts("Channels Opened.\n");	
-	
+  if (verbose_level == 1)
+    {
+      fprintf (stderr, "Channels Opened.\n");	
+    }
   /*****************************************************************/
   /*    Allocate memory for the transmit buffer and construct      */
   /*    the packet to transmit.                                    */
@@ -297,7 +303,7 @@ int __cdecl main(int argc, char *argv[]){
   char status;
 
 
-  //memcpy(pData, (U8*) data_to_write, 4);
+  //memcpy(pData, U8*) data_to_write, 4);
 
 
 
@@ -313,14 +319,17 @@ int __cdecl main(int argc, char *argv[]){
   fillPacketLenCalculated = RMAP_CalculateWriteCommandPacketLength(2, 1, 4,
 								   1);
 
-  printf("The write command packet will have a length of %ld bytes\n",
-	      fillPacketLenCalculated);
+  if (verbose_level == 1)
+    {
+      printf("The write command packet will have a length of %ld bytes\n",
+	           fillPacketLenCalculated);
+    }
 
   /* Allocate memory for the packet */
   pFillPacket = malloc(fillPacketLenCalculated);
   if (!pFillPacket)
     {
-      puts("Couldn't allocate the memory for the command packet");
+      fprintf (stderr, "Couldn't allocate the memory for the command packet\n");
       return;
     }
 
@@ -330,7 +339,7 @@ int __cdecl main(int argc, char *argv[]){
 				       fillPacketLenCalculated);
   if (!status)
     {
-      puts("Couldn't fill the write command packet");
+      fprintf (stderr, "Couldn't fill the write command packet\n");
       free(pFillPacket);
       return;
     }
@@ -342,7 +351,7 @@ int __cdecl main(int argc, char *argv[]){
   pRxTransferOp = STAR_createRxOperation(1, STAR_RECEIVE_PACKETS);
   if (pRxTransferOp == NULL)
     {
-      puts("\nERROR: Unable to create receive operation");
+      fprintf (stderr, "ERROR: Unable to create receive operation\n");
       return 0;
     }
 
@@ -351,7 +360,7 @@ int __cdecl main(int argc, char *argv[]){
 
   if (pTxStreamItem == NULL)
     {
-      puts("\nERROR: Unable to create the packet to be transmitted");
+      fprintf (stderr, "ERROR: Unable to create the packet to be transmitted\n");
       return 0;
     }
 
@@ -359,7 +368,7 @@ int __cdecl main(int argc, char *argv[]){
   pTxTransferOp = STAR_createTxOperation(&pTxStreamItem, 1U);
   if (pTxTransferOp == NULL)
     {
-      puts("\nERROR: Unable to create the transfer operation to be transmitted");
+      fprintf (stderr, "ERROR: Unable to create the transfer operation to be transmitted\n");
       return 0;
     }
 
@@ -372,7 +381,7 @@ int __cdecl main(int argc, char *argv[]){
   /* Submit the transmit operation */
   if (STAR_submitTransferOperation(txChannelId, pTxTransferOp) == 0)
     {
-      printf("\nERROR occurred during transmit.  Test failed.\n");
+      printf("ERROR occurred during transmit.\n\t\tTest failed.\n");
       return 0;
     }
 
@@ -384,13 +393,13 @@ int __cdecl main(int argc, char *argv[]){
 						    op_timeout);
   if(txStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
-      printf("\nERROR occurred during transmit.  Test failed.\n");
+      printf("ERROR occurred during transmit.\nTest failed.\n");
       return 0;
     }
 
 if (STAR_submitTransferOperation(txChannelId, pRxTransferOp) == 0)
     {
-      printf("\nERROR occurred during receive.  Test Tfailed.\n");
+      printf("ERROR occurred during receive. \nTest Tfailed.\n");
       return 0;
     }
 
@@ -399,7 +408,7 @@ if (STAR_submitTransferOperation(txChannelId, pRxTransferOp) == 0)
 						    op_timeout);
   if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
-      printf("\nERROR occurred during receive.  Test failed.\n");
+      printf("ERROR occurred during receive.\nTest failed.\n");
       return 0;
     }
 
@@ -462,8 +471,8 @@ if (STAR_submitTransferOperation(txChannelId, pRxTransferOp) == 0)
 
             if (rply_status == RMAP_SUCCESS)
             {
-              U16 transactionid = RMAP_GetTransactionID( &packetStruct);              
-              fprintf(stdout, "{\"%d\" : Success}\n", transactionid);              
+              U16 transactionid = RMAP_GetTransactionID( &packetStruct);      
+              fprintf(stdout, "{\"%d\" : Success}\n", transactionid);
             }
             else
             {

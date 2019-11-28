@@ -81,6 +81,7 @@ void display_packet_type(RMAP_PACKET_TYPE type);
 void display_packet_status(RMAP_STATUS status);
 void dumpPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket);
 unsigned long printRxPackets(STAR_TRANSFER_OPERATION * const pTransferOp);
+unsigned long dumpTransferOperation(STAR_TRANSFER_OPERATION * const pTransferOp);
 void printReply(STAR_SPACEWIRE_PACKET * StreamItemPacket);
 unsigned int random32(void);
 unsigned int random16(void);

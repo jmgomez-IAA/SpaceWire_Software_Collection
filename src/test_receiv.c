@@ -23,13 +23,13 @@
 
 clock_t start, finish;
 clock_t GET_TIME()
-{
-struct timeval tv;
-struct timezone tz;
+  {
+    struct timeval tv;
+    struct timezone tz;
 
-gettimeofday(&tv, &tz);
-return tv.tv_sec * 1000000 + tv.tv_usec;
-}
+    gettimeofday(&tv, &tz);
+    return tv.tv_sec * 1000000 + tv.tv_usec;
+  }
 #define TIME_DIVIDER    1000000
 
 

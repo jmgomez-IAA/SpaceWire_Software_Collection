@@ -88,7 +88,7 @@ int parse_parammeters (int paramc, char *const *paramv)
     return -1;
   }
 
-  while ((opt = getopt (paramc, paramv, "via:t:o:")) != -1)
+  while ((opt = getopt (paramc, paramv, "vria:t:o:")) != -1)
   {
     switch (opt)
     {
@@ -244,6 +244,12 @@ int __cdecl main(int argc, char *argv[]){
         fprintf (stderr, "STAR: Unable to identify device.\n");
         return 0U;
       }
+  }
+
+  if (reset_flag == 1)
+  {
+      STAR_resetDevice  ( deviceId);
+      return 0U;
   }
 
   /* Get the channels present on the device  */

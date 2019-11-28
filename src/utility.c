@@ -148,6 +148,46 @@ void dumpPacket( STAR_SPACEWIRE_PACKET * StreamItemPacket){
 }
 
 
+unsigned long dumpTransferOperation(STAR_TRANSFER_OPERATION * const pTransferOp)
+{
+  unsigned long i;
+  unsigned int rxPacketCount;
+  STAR_STREAM_ITEM *pRxStreamItem;
+
+  /* Get the number of traffic items received */
+  rxPacketCount = STAR_getTransferItemCount(pTransferOp);
+  if (rxPacketCount == 0)
+    {
+      printf("No packets received.\n");
+    }
+  else
+    {
+      /* For each traffic item received */
+      for (i = 0U; i < rxPacketCount; i++)
+        {
+      /* Get the packet */
+      pRxStreamItem = STAR_getTransferItem(pTransferOp, i);
+      if ((pRxStreamItem == NULL) || (pRxStreamItem->itemType !=
+                      STAR_STREAM_ITEM_TYPE_SPACEWIRE_PACKET) ||
+          (pRxStreamItem->item == NULL))
+            {
+          printf("\nERROR received an unexpected traffic type, or empty traffic item in item %lu\n",
+             i);
+            }
+      else
+            {
+            
+                dumpPacket( (STAR_SPACEWIRE_PACKET *)pRxStreamItem->item);
+            }
+        }
+    }
+
+  /* Return the error count */
+  return rxPacketCount;
+}
+
+
+
 void printReply(STAR_SPACEWIRE_PACKET * StreamItemPacket)
 {
 

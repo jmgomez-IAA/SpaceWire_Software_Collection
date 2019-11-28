@@ -64,6 +64,11 @@ TAGS
 *~
 \#*\#
 
+#Sublime Workspace and project
+*.sublime-project
+*.sublime-workspace
+
+
 #Skip autotools temporaly files
 *.swp
 DIST_REVISION

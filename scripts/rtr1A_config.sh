@@ -41,27 +41,27 @@ TIMEOUT=1
 #
 #Set routing table - Port mapping
 #
-# //ICU Main High priority
+# //ICU Main High priority:_Address 0x20
 ./src/rmap -a ${RTR_RTPMAP_ADD_32}  -d  ${RTR_PORT_17}  -t ${TIMEOUT}
-#ICU Main High priority
+#ICU Main High priority: Address 0x21
 ./src/rmap -a ${RTR_RTPMAP_ADD_33}   -d ${RTR_PORT_17}  -t ${TIMEOUT}
-#DPU 1
+#DPU 1: Address 0x2E
 ./src/rmap -a ${RTR_RTPMAP_ADD_46}   -d ${RTR_PORT_3}  -t ${TIMEOUT}
-#DPU 2
+#DPU 2: Address 0x2F
 ./src/rmap -a ${RTR_RTPMAP_ADD_47}  -d ${RTR_PORT_2}  -t ${TIMEOUT}
-#DPU 3
+#DPU 3: Address 0x30
 ./src/rmap -a ${RTR_RTPMAP_ADD_48}  -d ${RTR_PORT_5}  -t ${TIMEOUT}
-#DPU 4
+#DPU 4: Address 0x31
 ./src/rmap -a ${RTR_RTPMAP_ADD_49}  -d ${RTR_PORT_16}  -t ${TIMEOUT}
-#DPU 5
+#DPU 5: Address 0x32
 ./src/rmap -a ${RTR_RTPMAP_ADD_50}  -d ${RTR_PORT_12}  -t ${TIMEOUT}
-#DPU 6
+#DPU 6: Address 0x33
 ./src/rmap -a ${RTR_RTPMAP_ADD_51}  -d ${RTR_PORT_9}  -t ${TIMEOUT}
-#PSU Cntrl A
+#PSU Cntrl A: Address 0x48
 ./src/rmap -a ${RTR_RTPMAP_ADD_72}  -d ${RTR_PORT_6}  -t ${TIMEOUT}
-#PSU Cntrl B
+#PSU Cntrl B: Address 0x49
 ./src/rmap -a ${RTR_RTPMAP_ADD_73}  -d ${RTR_PORT_14}  -t ${TIMEOUT}
-#Test port
+#Test port: Address 0x4F
 ./src/rmap -a ${RTR_RTPMAP_ADD_79}  -d ${RTR_PORT_1}  -t ${TIMEOUT}
 
 #Routing table - Address control (Enable address)
