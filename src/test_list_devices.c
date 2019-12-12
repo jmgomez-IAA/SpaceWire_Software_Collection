@@ -51,6 +51,7 @@ int parse_parammeters (int paramc, char *const *paramv)
 {
   int opt;
 
+/*
   if (paramc == 1)
   {
     fprintf (stderr,"Argument expected.\n");
@@ -62,7 +63,7 @@ int parse_parammeters (int paramc, char *const *paramv)
     fprintf (stderr,"\n\n");
     return -1;
   }
-
+*/
   while ((opt = getopt (paramc, paramv, "vri")) != -1)
   {
     switch (opt)
@@ -163,7 +164,7 @@ int __cdecl main(int argc, char *argv[]){
     CFG_MK2_hardwareInfoToString(hardwareInfo, versionStr, buildDateStr);
 
     /* Get device Serial Number */
-    device_serial = STAR_getDeviceSerialNumber(deviceId);    
+    device_serial = STAR_getDeviceSerialNumber(deviceId);
 
     /* Display the hardware info*/
     if (verbose_level == 1)

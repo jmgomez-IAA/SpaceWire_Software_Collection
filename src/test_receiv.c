@@ -236,11 +236,8 @@ int __cdecl main(int argc, char *argv[]){
         }
 
         STAR_destroyString(device_serial);
-      }
-      
-
+      }      
     }
-
   }
   else
   {
@@ -320,6 +317,8 @@ int __cdecl main(int argc, char *argv[]){
   /***************************************************************/
   /*    Submit the operations                                    */
   /*                                                             */
+  /* if an operation there is fail and we already have 20 packets*/
+  /* close the app.                                              */
   /***************************************************************/
   int counter= 0;
   while(counter < 20 || (rxStatus == STAR_TRANSFER_STATUS_COMPLETE))
@@ -336,7 +335,7 @@ int __cdecl main(int argc, char *argv[]){
                                                       op_timeout);
     if (rxStatus != STAR_TRANSFER_STATUS_COMPLETE)
     {
-      fprintf (stderr, "ERROR occurred during receive.  Test failed.\n");      
+      fprintf (stderr, "ERROR occurred during receive.  Test failed.\n");
     }
 
     // Store the received packet in the file.
@@ -344,7 +343,7 @@ int __cdecl main(int argc, char *argv[]){
     unsigned int rxPacketCount = STAR_getTransferItemCount(pRxTransferOp);
     if (rxPacketCount == 0)
     {
-      fprintf (stderr, "No packets received.\n");
+      fprintf (stderr, "No packets received in this operation .\n");
     }
     else
     {
