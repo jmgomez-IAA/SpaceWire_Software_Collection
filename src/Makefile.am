@@ -1,4 +1,4 @@
-bin_PROGRAMS = loopback rmap rd_rmap receiv timecode reset
+bin_PROGRAMS = list loopback rmap rd_rmap receiv send timecode reset
 loopback_SOURCES = test_loopback.c utility.c
 loopback_LDADD = -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api
 
@@ -11,8 +11,14 @@ rd_rmap_LDADD =  -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_r
 reset_SOURCES = test_reset_dev.c utility.c
 reset_LDADD = -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api -lrmap_packet_library
 
+list_SOURCES = test_list_devices.c utility.c
+list_LDADD = -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api -lrmap_packet_library
+
 receiv_SOURCES = test_receiv.c utility.c
 receiv_LDADD  =  -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api -lrmap_packet_library
+
+send_SOURCES = test_send.c utility.c
+send_LDADD  =  -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api -lrmap_packet_library
 
 timecode_SOURCES = test_timecode.c utility.c
 timecode_LDADD  = -lpthread -lstar_conf_api_brick_mk3 -lstar_conf_api_mk2 -lstar_conf_api_router -lstar-api -lrmap_packet_library
