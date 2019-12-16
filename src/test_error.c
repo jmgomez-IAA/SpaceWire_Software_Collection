@@ -12,6 +12,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include "utility.h"
 #include "star-dundee_types.h"
 #include "star-api.h"
