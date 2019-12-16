@@ -47,12 +47,14 @@ static int address_flag;
 static int size_flag;
 static int timeout_flag;
 static int serial_flag;
+static int error_flag;
 
 static unsigned int verbose_level;
 static unsigned int address_to_write;
 static unsigned int packet_data_size;
 static unsigned int op_timeout;
 static unsigned int op_serial;
+static unsigned int error_type;
 
 int parse_parammeters (int paramc, char *const *paramv)
 {
@@ -72,7 +74,7 @@ int parse_parammeters (int paramc, char *const *paramv)
     return -1;
   }
 
-  while ((opt = getopt (paramc, paramv, "vris:b:a:p:t:")) != -1)
+  while ((opt = getopt (paramc, paramv, "vris:b:a:p:t:e:")) != -1)
   {
     switch (opt)
     {
@@ -97,6 +99,13 @@ int parse_parammeters (int paramc, char *const *paramv)
         unsigned long param_data = strtoul(optarg, NULL, 10);
         packet_data_size = (unsigned int) param_data;
         if (verbose_flag == 1) fprintf (stderr,"The data size supplied is %d\n", packet_data_size);
+        break;
+
+      case 'e':
+        error_flag = 1;
+        unsigned long param_error = strtoul(optarg, NULL, 10);
+        error_type = (unsigned int) param_error;
+        if (verbose_flag == 1) fprintf (stderr,"The data size supplied is %d\n", error_type);
         break;
 
       case 'a':  //address supplied
@@ -173,10 +182,12 @@ int __cdecl main(int argc, char *argv[]){
   timeout_flag    = 0;
   identify_flag   = 0;
   reset_flag      = 0;
+  error_flag      = 0;
 
   verbose_level   = 0;
   address_to_write = 0;
   packet_data_size = 0;
+  error_type      = 0;
 
 
     // Parse parammeteres
@@ -362,13 +373,21 @@ int __cdecl main(int argc, char *argv[]){
                                     pTxBuffer + packetStartLength,
                                     byteSize - packetStartLength, 0, STAR_EOP_TYPE_EOP);
   
+
   disconnectErrorItem = STAR_createErrorInData(
                                     STAR_ERROR_IN_DATA_DISCONNECT);
   
   parityErrorItem = STAR_createErrorInData(STAR_ERROR_IN_DATA_PARITY);
   /* Make packet with from stream items with disconnect error */
   pTxStreamItem[0] = packetStart;
-  pTxStreamItem[1] = disconnectErrorItem;
+
+  if (error_type == 1)
+    pTxStreamItem[1] = disconnectErrorItem;
+
+  if (error_type == 2)
+    pTxStreamItem[1] = parityErrorItem;
+
+
   pTxStreamItem[2] = packetEnd;
 
   if (pTxStreamItem == NULL)
