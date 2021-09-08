@@ -312,12 +312,13 @@ int __cdecl main(int argc, char *argv[]){
     printf("\nBuildDate: %s", buildDateStr);	
   }
   // Flashes the LEDS.
+  /*
   if (CFG_MK2_identify(deviceId) == 0)
     {
       fprintf (stderr, "\nERROR: Unable to identify device");
       return 0U;
     }
-
+*/
   /* Get the channels present on the device  */
   /* We need at least 2 Channels (0x00000007) */
   channelMask = STAR_getDeviceChannels(deviceId);
@@ -483,12 +484,6 @@ int __cdecl main(int argc, char *argv[]){
 
     }
 
-  if (errorCount == 0)
-    fprintf(stdout, "{\"%d\" : Success}\n", transactionid);
-  else
-    fprintf(stdout, "{\"%d\" : Fail, \"Error Count\": %d}\n", transactionid, errorCount);
-
-
   
   /* Dispose of the transfer operations */
   if (pTxTransferOp != NULL)
@@ -530,7 +525,17 @@ int __cdecl main(int argc, char *argv[]){
       STAR_closeChannel(txChannelId);
     }
 
-  return 0;
+  if (errorCount == 0)
+  {
+    fprintf(stdout, "{\"%d\" : Success}\n", transactionid);
+    return 0;
+  }
+  else
+  {
+    fprintf(stdout, "{\"%d\" : Fail, \"Error Count\": %d}\n", transactionid, errorCount);
+    return 1;
+  }
+
 }
 
 

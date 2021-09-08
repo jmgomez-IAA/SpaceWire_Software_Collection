@@ -241,11 +241,11 @@ int __cdecl main(int argc, char *argv[]){
     }
 
   // Flashes the LEDS.
-  if (CFG_MK2_identify(deviceId) == 0)
-    {
-      fprintf (stderr, "ERROR: Unable to identify device\n");
-      return 0U;
-    }
+  //if (CFG_MK2_identify(deviceId) == 0)
+  //  {
+  //    fprintf (stderr, "ERROR: Unable to identify device\n");
+  //    return 0U;
+  //  }
 
   /* Get the channels present on the device  */
   /* We need at least 2 Channels (0x00000007) */
