@@ -1,0 +1,362 @@
+#ifndef ROUTERREGISTER_H
+#define ROUTERREGISTER_H
+
+//Status registers
+#define ROUTER_LINK_RUN_STATUS_REGISTER 0x00000A40
+
+//Routing table port mapping
+#define RTR_RTPMAP_ADD_32 0x00000080 //0x20
+#define RTR_RTPMAP_ADD_33 0x00000084
+#define RTR_RTPMAP_ADD_34 0x00000088
+#define RTR_RTPMAP_ADD_35 0x0000008C
+#define RTR_RTPMAP_ADD_36 0x00000090
+#define RTR_RTPMAP_ADD_37 0x00000094
+#define RTR_RTPMAP_ADD_38 0x00000098
+#define RTR_RTPMAP_ADD_39 0x0000009C
+#define RTR_RTPMAP_ADD_40 0x000000A0
+#define RTR_RTPMAP_ADD_41 0x000000A4
+#define RTR_RTPMAP_ADD_42 0x000000A8
+#define RTR_RTPMAP_ADD_43 0x000000AC
+#define RTR_RTPMAP_ADD_44 0x000000B0
+#define RTR_RTPMAP_ADD_45 0x000000B4
+#define RTR_RTPMAP_ADD_46 0x000000B8
+#define RTR_RTPMAP_ADD_47 0x000000BC
+#define RTR_RTPMAP_ADD_48 0x000000C0 //0x30
+#define RTR_RTPMAP_ADD_49 0x000000C4
+#define RTR_RTPMAP_ADD_50 0x000000C8
+#define RTR_RTPMAP_ADD_51 0x000000CC
+#define RTR_RTPMAP_ADD_52 0x000000D0
+#define RTR_RTPMAP_ADD_53 0x000000D4
+#define RTR_RTPMAP_ADD_54 0x000000D8
+#define RTR_RTPMAP_ADD_55 0x000000DC
+#define RTR_RTPMAP_ADD_56 0x000000E0
+#define RTR_RTPMAP_ADD_57 0x000000E4
+#define RTR_RTPMAP_ADD_58 0x000000E8
+#define RTR_RTPMAP_ADD_59 0x000000EC
+#define RTR_RTPMAP_ADD_60 0x000000F0
+#define RTR_RTPMAP_ADD_61 0x000000F4
+#define RTR_RTPMAP_ADD_62 0x000000F8
+#define RTR_RTPMAP_ADD_63 0x000000FC
+#define RTR_RTPMAP_ADD_64 0x00000100 //0x40
+#define RTR_RTPMAP_ADD_65 0x00000104
+#define RTR_RTPMAP_ADD_66 0x00000108
+#define RTR_RTPMAP_ADD_67 0x0000010C
+#define RTR_RTPMAP_ADD_68 0x00000110
+#define RTR_RTPMAP_ADD_69 0x00000114
+#define RTR_RTPMAP_ADD_70 0x00000118
+#define RTR_RTPMAP_ADD_71 0x0000011C
+#define RTR_RTPMAP_ADD_72 0x00000120
+#define RTR_RTPMAP_ADD_73 0x00000124
+#define RTR_RTPMAP_ADD_74 0x00000128
+#define RTR_RTPMAP_ADD_75 0x0000012C
+#define RTR_RTPMAP_ADD_76 0x00000130
+#define RTR_RTPMAP_ADD_77 0x00000134
+#define RTR_RTPMAP_ADD_78 0x00000138
+#define RTR_RTPMAP_ADD_79 0x0000013C
+#define RTR_RTPMAP_ADD_254 0x000003F8 //0xFE
+
+//Routing table address control registers
+#define RTR_RTACTRL_ADD_32 0x00000480
+#define RTR_RTACTRL_ADD_33 0x00000484
+#define RTR_RTACTRL_ADD_34 0x00000488
+#define RTR_RTACTRL_ADD_35 0x0000048C
+#define RTR_RTACTRL_ADD_36 0x00000490
+#define RTR_RTACTRL_ADD_37 0x00000494
+#define RTR_RTACTRL_ADD_38 0x00000498
+#define RTR_RTACTRL_ADD_39 0x0000049C
+#define RTR_RTACTRL_ADD_40 0x000004A0
+#define RTR_RTACTRL_ADD_41 0x000004A4
+#define RTR_RTACTRL_ADD_42 0x000004A8
+#define RTR_RTACTRL_ADD_43 0x000004AC
+#define RTR_RTACTRL_ADD_44 0x000004B0
+#define RTR_RTACTRL_ADD_45 0x000004B4
+#define RTR_RTACTRL_ADD_46 0x000004B8
+#define RTR_RTACTRL_ADD_47 0x000004BC
+#define RTR_RTACTRL_ADD_48 0x000004C0 //0x30
+#define RTR_RTACTRL_ADD_49 0x000004C4
+#define RTR_RTACTRL_ADD_50 0x000004C8
+#define RTR_RTACTRL_ADD_51 0x000004CC
+#define RTR_RTACTRL_ADD_52 0x000004D0
+#define RTR_RTACTRL_ADD_53 0x000004D4
+#define RTR_RTACTRL_ADD_54 0x000004D8
+#define RTR_RTACTRL_ADD_55 0x000004DC
+#define RTR_RTACTRL_ADD_56 0x000004E0
+#define RTR_RTACTRL_ADD_57 0x000004E4
+#define RTR_RTACTRL_ADD_58 0x000004E8
+#define RTR_RTACTRL_ADD_59 0x000004EC
+#define RTR_RTACTRL_ADD_60 0x000004F0
+#define RTR_RTACTRL_ADD_61 0x000004F4
+#define RTR_RTACTRL_ADD_62 0x000004F8
+#define RTR_RTACTRL_ADD_63 0x000004FC
+#define RTR_RTACTRL_ADD_64 0x00000500 //0x40
+#define RTR_RTACTRL_ADD_65 0x00000504
+#define RTR_RTACTRL_ADD_66 0x00000508
+#define RTR_RTACTRL_ADD_67 0x0000050C
+#define RTR_RTACTRL_ADD_68 0x00000510
+#define RTR_RTACTRL_ADD_69 0x00000514
+#define RTR_RTACTRL_ADD_70 0x00000518
+#define RTR_RTACTRL_ADD_71 0x0000051C
+#define RTR_RTACTRL_ADD_72 0x00000520
+#define RTR_RTACTRL_ADD_73 0x00000524
+#define RTR_RTACTRL_ADD_74 0x00000528
+#define RTR_RTACTRL_ADD_75 0x0000052C
+#define RTR_RTACTRL_ADD_76 0x00000530
+#define RTR_RTACTRL_ADD_77 0x00000534
+#define RTR_RTACTRL_ADD_78 0x00000538
+#define RTR_RTACTRL_ADD_79 0x0000053C
+#define RTR_RTACTRL_ADD_254 0x000007F8 //0xFE
+
+//Value with routing table enable, spill enable and header deletion disable
+#define RTR_RTACTRL_ADD_VALUE_HD_NO 0x0000000C
+//The same but with header deletion enable
+#define RTR_RTACTRL_ADD_VALUE_HD_YES 0x0000000D
+
+//Port definition
+#define RTR_PORT_1 0x00000002
+#define RTR_PORT_2 0x00000004
+#define RTR_PORT_3 0x00000008
+#define RTR_PORT_4 0x00000010
+#define RTR_PORT_5 0x00000020
+#define RTR_PORT_6 0x00000040
+#define RTR_PORT_7 0x00000080
+#define RTR_PORT_8 0x00000100
+#define RTR_PORT_9 0x00000200
+#define RTR_PORT_10 0x00000400
+#define RTR_PORT_11 0x00000800
+#define RTR_PORT_12 0x00001000
+#define RTR_PORT_14 0x00004000
+#define RTR_PORT_15 0x00008000
+#define RTR_PORT_16 0x00010000
+#define RTR_PORT_17 0x00020000
+#define RTR_PORT_18 0x00040000
+
+//Port control registers
+#define RTR_PCTRL_PORT_1 0x00000804
+#define RTR_PCTRL_PORT_2 0x00000808
+#define RTR_PCTRL_PORT_3 0x0000080C
+#define RTR_PCTRL_PORT_4 0x00000810
+#define RTR_PCTRL_PORT_5 0x00000814
+#define RTR_PCTRL_PORT_6 0x00000818
+#define RTR_PCTRL_PORT_7 0x0000081C
+#define RTR_PCTRL_PORT_8 0x00000820
+#define RTR_PCTRL_PORT_9 0x00000824
+#define RTR_PCTRL_PORT_10 0x00000828
+#define RTR_PCTRL_PORT_11 0x0000082C
+#define RTR_PCTRL_PORT_12 0x00000830
+#define RTR_PCTRL_PORT_13 0x00000834
+#define RTR_PCTRL_PORT_14 0x00000838
+#define RTR_PCTRL_PORT_15 0x0000083C
+#define RTR_PCTRL_PORT_16 0x00000840
+#define RTR_PCTRL_PORT_17 0x00000844
+#define RTR_PCTRL_PORT_18 0x00000848
+#define RTR_PCTRL_PORT_19 0x0000084C
+
+//Port control values
+//LS, AS, CE, TE, RS, TF, LR, SR
+#define RTR_PCTRL_PORT_VALUE_START_AND_10MHZ  0x091400FE
+#define RTR_PCTRL_PORT_VALUE_START_AND_100MHZ 0x001400FE
+//LD, RS, DI, LR, SR
+#define RTR_PCTRL_PORT_VALUE_DISABLE_PORT 0x00140401
+
+#define ROUTER_PORT_CONTROL_REGISTER_COUNT 10
+
+
+typedef struct RouterLinkRunningStatusRegisterTemplate
+{
+    union
+    {
+        uint32_t status;
+        struct
+        {
+            uint32_t reserved   : 01; //LS bit
+            uint32_t port1      : 01;
+            uint32_t port2      : 01;
+            uint32_t port3      : 01;
+            uint32_t port4      : 01;
+            uint32_t port5      : 01;
+            uint32_t port6      : 01;
+            uint32_t port7      : 01;
+            uint32_t port8      : 01;
+            uint32_t port9      : 01;
+            uint32_t port10     : 01;
+            uint32_t port11     : 01;
+            uint32_t port12     : 01;
+            uint32_t port13     : 01;
+            uint32_t port14     : 01;
+            uint32_t port15     : 01;
+            uint32_t port16     : 01;
+            uint32_t port17     : 01;
+            uint32_t port18     : 01;
+            uint32_t reserved2  : 13;
+        };
+    };
+} RouterLinkRunningStatusRegisterTemplate;
+
+
+typedef struct RouterPortControlRegisterTemplate
+{
+    union
+    {
+        uint32_t status;
+        struct
+        {
+            uint32_t ld      : 01; //LS bit
+            uint32_t ls      : 01;
+            uint32_t as      : 01;
+            uint32_t ce      : 01;
+            uint32_t r       : 01;
+            uint32_t te      : 01;
+            uint32_t rs      : 01;
+            uint32_t tf      : 01;
+            uint32_t pr      : 01;
+            uint32_t tr      : 01;
+            uint32_t di      : 01;
+            uint32_t reseved : 03;
+            uint32_t et      : 01;
+            uint32_t ic      : 01;
+            uint32_t ts      : 01;
+            uint32_t pl      : 01;
+            uint32_t lr      : 01;
+            uint32_t ad      : 01;
+            uint32_t sr      : 01;
+            uint32_t st      : 01;
+            uint32_t res     : 02;
+            uint32_t rd      : 8;
+        };
+    };
+} RouterPortControlRegisterTemplate;
+
+
+
+#endif // ROUTERREGISTER_H
+
+
+void RouterModule::configureRouter(void){
+
+    logger->add("------------------");
+    logger->add("Configure router");
+    logger->add("-------------------");
+
+
+#ifdef MEU_BREADBOARD_1
+
+     //Config ports (Start link and speed)
+     writeRouterRegister(RTR_PCTRL_PORT_1, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ); //Port 1: DPU1
+     writeRouterRegister(RTR_PCTRL_PORT_2, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ); //Port 2: ICUA
+     writeRouterRegister(RTR_PCTRL_PORT_3, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ); //Port 3: TEST
+     writeRouterRegister(RTR_PCTRL_PORT_4, RTR_PCTRL_PORT_VALUE_START_AND_10MHZ); //Port 4: PSU
+
+     //Routing table - Port mapping
+     writeRouterRegister(RTR_RTPMAP_ADD_70, RTR_PORT_1); //Port 1: set logical address 0x46
+     writeRouterRegister(RTR_RTPMAP_ADD_33, RTR_PORT_2); //Port 2: set logical address 0x21
+     writeRouterRegister(RTR_RTPMAP_ADD_34, RTR_PORT_3); //Port 3: set logical address 0x22
+     writeRouterRegister(RTR_RTPMAP_ADD_72, RTR_PORT_4); //Port 4: set logical address 0x48
+
+     //Routing table - Address control (Enable address)
+     writeRouterRegister(RTR_RTACTRL_ADD_70, RTR_RTACTRL_ADD_VALUE_HD_NO); //LA 0x46: enable logical add
+     writeRouterRegister(RTR_RTACTRL_ADD_33, RTR_RTACTRL_ADD_VALUE_HD_NO); //LA 0x21: enable logical add
+     writeRouterRegister(RTR_RTACTRL_ADD_34, RTR_RTACTRL_ADD_VALUE_HD_NO); //LA 0x22: enable logical add
+     writeRouterRegister(RTR_RTACTRL_ADD_72, RTR_RTACTRL_ADD_VALUE_HD_NO); //LA 0x48: enable logical add
+     writeRouterRegister(RTR_RTACTRL_ADD_254, RTR_RTACTRL_ADD_VALUE_HD_NO); //LA 0xFE: enable logical add
+#endif
+
+#ifdef ICU_A
+    //Config ports: Enable and speed/Disable
+    writeRouterRegister(RTR_PCTRL_PORT_1,  RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_2,  RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_3,  RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_4,  RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_5,  RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_6,  RTR_PCTRL_PORT_VALUE_START_AND_10MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_7,  RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_8,  RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_9,  RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_10, RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_11, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_12, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_13, RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_14, RTR_PCTRL_PORT_VALUE_START_AND_10MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_15, RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_16, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_17, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_18, RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+
+    //Set routing table - Port mapping
+    writeRouterRegister(RTR_RTPMAP_ADD_32, RTR_PORT_17); //ICU Main High priority
+    writeRouterRegister(RTR_RTPMAP_ADD_33, RTR_PORT_17); //ICU Main High priority
+    writeRouterRegister(RTR_RTPMAP_ADD_46, RTR_PORT_3);  //DPU 1
+    writeRouterRegister(RTR_RTPMAP_ADD_47, RTR_PORT_2);  //DPU 2
+    writeRouterRegister(RTR_RTPMAP_ADD_48, RTR_PORT_5);  //DPU 3
+    writeRouterRegister(RTR_RTPMAP_ADD_49, RTR_PORT_16); //DPU 4
+    writeRouterRegister(RTR_RTPMAP_ADD_50, RTR_PORT_12); //DPU 5
+    writeRouterRegister(RTR_RTPMAP_ADD_51, RTR_PORT_9);  //DPU 6
+    writeRouterRegister(RTR_RTPMAP_ADD_72, RTR_PORT_6);  //PSU Cntrl A
+    writeRouterRegister(RTR_RTPMAP_ADD_73, RTR_PORT_14); //PSU Cntrl B
+    writeRouterRegister(RTR_RTPMAP_ADD_79, RTR_PORT_1); //Test port
+
+    //Routing table - Address control (Enable address)
+    writeRouterRegister(RTR_RTACTRL_ADD_32, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_33, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_46, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_47, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_48, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_49, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_50, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_51, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_72, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_73, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_79, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_254, RTR_RTACTRL_ADD_VALUE_HD_NO);
+#endif
+
+#ifdef ICU_B
+    //Config ports: Enable and speed/Disable
+    writeRouterRegister(RTR_PCTRL_PORT_1,  RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_2,  RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_3,  RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_4,  RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_5,  RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_6,  RTR_PCTRL_PORT_VALUE_START_AND_10MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_7,  RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_8,  RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_9,  RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_10, RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_11, RTR_PCTRL_PORT_VALUE_START_AND_10MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_12, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_13, RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_14, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_15, RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+    writeRouterRegister(RTR_PCTRL_PORT_16, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_17, RTR_PCTRL_PORT_VALUE_START_AND_100MHZ);
+    writeRouterRegister(RTR_PCTRL_PORT_18, RTR_PCTRL_PORT_VALUE_DISABLE_PORT);
+
+    //Set routing table - Port mapping
+    writeRouterRegister(RTR_RTPMAP_ADD_32, RTR_PORT_17); //ICU Main High priority
+    writeRouterRegister(RTR_RTPMAP_ADD_33, RTR_PORT_17); //ICU Main High priority
+    writeRouterRegister(RTR_RTPMAP_ADD_46, RTR_PORT_3);  //DPU 1
+    writeRouterRegister(RTR_RTPMAP_ADD_47, RTR_PORT_2);  //DPU 2
+    writeRouterRegister(RTR_RTPMAP_ADD_48, RTR_PORT_5);  //DPU 3
+    writeRouterRegister(RTR_RTPMAP_ADD_49, RTR_PORT_14); //DPU 4
+    writeRouterRegister(RTR_RTPMAP_ADD_50, RTR_PORT_16); //DPU 5
+    writeRouterRegister(RTR_RTPMAP_ADD_51, RTR_PORT_12);  //DPU 6
+    writeRouterRegister(RTR_RTPMAP_ADD_72, RTR_PORT_6);  //PSU Cntrl A
+    writeRouterRegister(RTR_RTPMAP_ADD_73, RTR_PORT_11); //PSU Cntrl B
+    //writeRouterRegister(RTR_RTPMAP_ADD_79, RTR_PORT_1); //Test port
+
+    //Routing table - Address control (Enable address)
+    writeRouterRegister(RTR_RTACTRL_ADD_32, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_33, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_46, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_47, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_48, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_49, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_50, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_51, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_72, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_73, RTR_RTACTRL_ADD_VALUE_HD_NO);
+  //  writeRouterRegister(RTR_RTACTRL_ADD_79, RTR_RTACTRL_ADD_VALUE_HD_NO);
+    writeRouterRegister(RTR_RTACTRL_ADD_254, RTR_RTACTRL_ADD_VALUE_HD_NO);
+#endif
+
+}
+
